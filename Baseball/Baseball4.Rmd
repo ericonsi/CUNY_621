@@ -22,8 +22,8 @@ library(gridExtra)
 
 
 ```{r}
-dfTrain <- read.csv("D:\\RStudio\\621\\Baseball\\moneyball-training-data.csv", header=TRUE)
-dfEval <- read.csv("D:\\RStudio\\621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+dfTrain <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
 
 colnames(dfTrain)<-gsub("TEAM_","",colnames(dfTrain))
 
@@ -799,10 +799,17 @@ qq <- EHExplore_Outliers_Boxplots(dfTeenGamb)
 qq1 <- EHExplore_Correlations_Scatterplots(dfTeenGamb, "gamble")
 qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb)
 
-zz <- EHExplore_CombineGraphs3(qq,qq2,qq1)
-print 
+#zz <- EHExplore_CombineGraphs3(qq,qq2,qq1)
 
-grid.arrange(grobs=zz[c(1:15)], ncol=3, nrow=5)
+#grid.arrange(grobs=zz[c(1:15)], ncol=3, nrow=5)
+
+grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
+
+grid.arrange(grobs=qq[c(1:5)], ncol=5, nrow=1)
+grid.arrange(grobs=qq1[c(1:5)], ncol=5, nrow=1)
+grid.arrange(grobs=qq2[c(1:5)], ncol=5, nrow=1)
+
+grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
 
 summary(lm(gamble ~ ., dfTeenGamb))
 
