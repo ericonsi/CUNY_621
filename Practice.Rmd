@@ -25,12 +25,12 @@ library(QuantPsyc)
 
 #### The data is loaded into the database
 
-```{r db connect, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+```{r db connect, echo=TRUE}
 
 # This is the connection string:
 
 strConnection <- paste0(
-  'Driver={ODBC Driver 13 for SQL Server};
+  'Driver={ODBC Driver 17 for SQL Server};
    Server=tcp:ehtmp.database.windows.net,1433;
    Database=HC_A1C;
    Encrypt=yes;

@@ -119,7 +119,10 @@ library(ggsci)
   
 plot_list <- list()
 
-for(i in 1:ncol(df)) {                              
+for(i in 1:ncol(df)) {     
+    if(is.numeric(df[,i]))
+  {
+      
   p <- eval(substitute(ggplot(df, aes_string(df[ , i], y, color=interaction)) +
   geom_point() +
   geom_smooth(method = "lm", se=FALSE) +
@@ -129,6 +132,8 @@ for(i in 1:ncol(df)) {
   scale_fill_d3()+
   ggtitle(colnames(df)[i]), list(i=i)))
   plot_list[[i]] <- p 
+  
+    }
 }
   return(plot_list)
 }
@@ -172,6 +177,9 @@ plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
   
+  if(is.numeric(df[,i]))
+  {
+  
   qp <- toString(head(sort(round(df[,i],2)),5))
   qz <- toString(tail(sort(round(df[,i],2)),5))
   qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
@@ -183,9 +191,12 @@ for(i in 1:ncol(df)) {
           theme(axis.title.x = element_text(size = s), axis.title.y = element_text(size = 9), axis.text.x = element_blank(), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray"))  + 
           geom_boxplot(), list(i=i)))
   plot_list2[[i]] <- p 
+  
+  }
 }
 return (plot_list2)
 }
+
 
 z <- EHExplore_Outliers_Boxplots(dfTrain_ImputedMean_NoCohort, "small")
 wrap_plots(z)
@@ -206,6 +217,9 @@ plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
   
+    if(is.numeric(df[,i]))
+  {
+  
   qp <- toString(head(sort(round(df[,i],2)),5))
   qz <- toString(tail(sort(round(df[,i],2)),5))
   qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
@@ -217,6 +231,8 @@ for(i in 1:ncol(df)) {
   geom_histogram(bins=nbins, fill="white", aes(y = stat(density))) +
       geom_density(col = "red"), list(i=i)))
   plot_list2[[i]] <- p 
+  
+    }
 }
 return (plot_list2)
 }
@@ -498,6 +514,9 @@ EHExplore_Correlations_Scatterplots <- function(df, y)
   plot_list <- list()
   
   for(i in 1:ncol(df)) {
+    
+      if(is.numeric(df[,i]))
+  {
   
     ct <- cor.test(df[,i], df[,y])
     
@@ -511,6 +530,8 @@ EHExplore_Correlations_Scatterplots <- function(df, y)
     theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
   ggtitle(colnames(df)[i]), list(i=i)))
   plot_list[[i]] <- p 
+      }
+    
 }
   return(plot_list)
 }
@@ -812,9 +833,9 @@ dfTeenGamb <- teengamb
 
 dfTeenGamb$gamble <- log(dfTeenGamb$gamble+1)
 
-qq <- EHExplore_Outliers_Boxplots(dfTeenGamb, "large")
+qq <- EHExplore_Outliers_Boxplots(dfTeenGamb)
 qq1 <- EHExplore_Correlations_Scatterplots(dfTeenGamb, "gamble")
-qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb, size="large", nbins=50)
+qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb, nbins=50)
 
 abc <- EHExplore_IntegratePlotLists(qq,qq1,qq2)
 grid.arrange(grobs=abc[c(1:15)],  ncol=3, nrow=5)
@@ -829,4 +850,54 @@ summary(lm(gamble ~ ., dfTeenGamb))
 summary(lm(gamble ~ status*sex + income*sex + verbal*sex, dfTeenGamb))
 
 ```
+```{r db connect, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+
+# This is the connection string:
+
+library(RODBC)
+
+strConnection <- paste0(
+  'Driver={ODBC Driver 17 for SQL Server};
+   Server=tcp:ehtmp.database.windows.net,1433;
+   Database=HC_A1C;
+   Encrypt=yes;
+   TrustServerCertificate=no;
+   Connection Timeout=30;
+   Uid=datany2021;
+   Pwd=MSinDS123;'
+)
+
+dbConnection <- odbcDriverConnect(strConnection)
+
+dfA1C <- sqlQuery(dbConnection, "SELECT * FROM tblA1C")
+dfA1C %<>%
+  mutate(A1CDropPerCent=-1*(MostrecentA1C - DiagA1C)/DiagA1C) %<>%
+  mutate(A1CDrop= -1*(MostrecentA1C - DiagA1C)) %>%
+  mutate(Improved = case_when(A1CDrop > 0 ~ 1,
+                           A1CDrop <= 0 ~ 0))  %>%
+  filter(A1CDrop<7.4)
+
+```
+
+
+```{r}
+
+a1 <- EHExplore_Outliers_Boxplots(dfA1C)
+a2 <- EHExplore_Distributions_Histograms(dfA1C)
+a3 <- EHExplore_Correlations_Scatterplots(dfA1C, "A1CDrop")
+
+a4 <- EHExplore_IntegratePlotLists(a1, a2, a3)
+
+grid.arrange(grobs=a4[c(1:12)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(13:24)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(25:36)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(37:48)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(49:60)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(61:72)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(73:84)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(85:96)], nrow=4, ncol=3)
+grid.arrange(grobs=a4[c(97:99)], nrow=1, ncol=3)
+
+```
+
 
