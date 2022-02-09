@@ -22,8 +22,17 @@ library(gridExtra)
 
 
 ```{r}
+
+location <- "work"
+
+if (location == "work"){
+dfTrain <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\Rstudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+dfEval <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+} else
+{
 dfTrain <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
 dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+}
 
 colnames(dfTrain)<-gsub("TEAM_","",colnames(dfTrain))
 
@@ -104,19 +113,18 @@ Now we can look at interactions between the "cohort" and other variables:
 
 EHExplore_Interactions_Scatterplots <- function(df, y, interaction) {
 
+df[,interaction] <- as.factor(df[,interaction])
+  
 library(ggsci)
   
 plot_list <- list()
-
-df$Missing_Flag <- as.factor(df$Missing_Flag)
 
 for(i in 1:ncol(df)) {                              
   p <- eval(substitute(ggplot(df, aes_string(df[ , i], y, color=interaction)) +
   geom_point() +
   geom_smooth(method = "lm", se=FALSE) +
-  #scale_color_brewer(palette="Set1") +
-  xlab("") +
-  theme(title = element_text(size=7)) +
+    xlab("") +
+    theme(title = element_text(size=7), axis.title.x = element_text(size = 7), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), panel.grid.major.x = element_line(color="gray"), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
   scale_color_d3()+
   scale_fill_d3()+
   ggtitle(colnames(df)[i]), list(i=i)))
@@ -156,7 +164,7 @@ summary(dfTrain_ImputedMean_NoCohort)
 EHExplore_Outliers_Boxplots <- function(df, size="small")
 {
   
-s <- 6
+s <- 7
 if (size=="large") {
   s <- 10
 }
@@ -164,9 +172,9 @@ plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
   
-  qp <- toString(head(sort(df[,i]),5))
-  qz <- toString(tail(sort(df[,i]),5))
-  qk <- str_c(qp, "\\\n", qz)
+  qp <- toString(head(sort(round(df[,i],2)),5))
+  qz <- toString(tail(sort(round(df[,i],2)),5))
+  qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
   
   p <- eval(substitute(ggplot(df, aes(df[,i])) +
           coord_flip() +  
@@ -187,9 +195,9 @@ wrap_plots(z)
 ```{r}
 
 
-EHExplore_Distributions_Histograms <- function(df, size = "small")
+EHExplore_Distributions_Histograms <- function(df, size = "small", nbins = 100)
 {
-s <- 6
+s <- 7
 if (size=="large") {
   s <- 10
 }
@@ -198,15 +206,15 @@ plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
   
-  qp <- toString(head(sort(df[,i]),5))
-  qz <- toString(tail(sort(df[,i]),5))
-  qk <- str_c("L: ", qp, "\\\n", "H: ", qz)
+  qp <- toString(head(sort(round(df[,i],2)),5))
+  qz <- toString(tail(sort(round(df[,i],2)),5))
+  qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
   
   p <- eval(substitute(ggplot(df, aes(df[,i])) +
           ylab(colnames(df)[i])  +
           xlab(qk) +
           theme(axis.title.x = element_text(size = s), axis.title.y = element_text(size = 9), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(size=8),  panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_blank(), panel.background = element_rect(fill = "slategray2", color="darkslategray"))  + 
-  geom_histogram(bins=100, fill="white", aes(y = stat(density))) +
+  geom_histogram(bins=nbins, fill="white", aes(y = stat(density))) +
       geom_density(col = "red"), list(i=i)))
   plot_list2[[i]] <- p 
 }
@@ -516,6 +524,20 @@ grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
 
 ```{r fig.height=12}
 
+EHExplore_IntegratePlotLists <-function(list1, list2, list3)
+{  
+zz2 <- list()
+
+for(i in 1:length(list1)) {
+zz2[i*3-2] <- list1[i]
+zz2[i*3-1] <- list2[i]
+zz2[i*3] <- list3[i]
+}
+return(zz2)
+}
+
+
+
 zz1 <- list()
 
 for(i in 1:length(z)) {
@@ -654,19 +676,12 @@ looking for interactions:
 
 ```{r}
 
-par(mfcol=c(2,2))
-
 dfTrain_ImputedMedian8 <- dfTrain_ImputedMedian %>%
   mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0))
 
-dfTrain_ImputedMedian8$Pitch_h_Under1500 <- as.factor(dfTrain_ImputedMedian8$Pitch_h_Under1500)
-
-for(i in 2:ncol(dfTrain_ImputedMedian8)) {                              
-  print(ggplot(dfTrain_ImputedMedian8, aes(dfTrain_ImputedMedian8[,i], TARGET_WINS, color=Pitch_h_Under1500)) +
-  geom_point() +
-  geom_smooth(method = "lm", se=FALSE) +
-  ggtitle(colnames(dfTrain_ImputedMedian8)[i]))
-}
+ghi <- EHExplore_Interactions_Scatterplots(dfTrain_ImputedMedian8, "TARGET_WINS", "Pitch_h_Under1500")
+grid.arrange(grobs=ghi[c(1:8)], ncol=2, nrow=4)
+grid.arrange(grobs=ghi[c(9:16)], ncol=2, nrow=4)
 ```
 Similar analysis with the data missing records:
 
@@ -791,27 +806,27 @@ x <- dfTrain_ImputedMean_NoCohort %>%
 x
 
 ```
-```{r}
+```{r fig.height=8}
 data(teengamb, package="faraway")
 dfTeenGamb <- teengamb
 
-qq <- EHExplore_Outliers_Boxplots(dfTeenGamb)
+dfTeenGamb$gamble <- log(dfTeenGamb$gamble+1)
+
+qq <- EHExplore_Outliers_Boxplots(dfTeenGamb, "large")
 qq1 <- EHExplore_Correlations_Scatterplots(dfTeenGamb, "gamble")
-qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb)
+qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb, size="large", nbins=50)
 
-#zz <- EHExplore_CombineGraphs3(qq,qq2,qq1)
+abc <- EHExplore_IntegratePlotLists(qq,qq1,qq2)
+grid.arrange(grobs=abc[c(1:15)],  ncol=3, nrow=5)
+``` 
 
-#grid.arrange(grobs=zz[c(1:15)], ncol=3, nrow=5)
+```{r}
 
-grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
-
-grid.arrange(grobs=qq[c(1:5)], ncol=5, nrow=1)
-grid.arrange(grobs=qq1[c(1:5)], ncol=5, nrow=1)
-grid.arrange(grobs=qq2[c(1:5)], ncol=5, nrow=1)
-
-grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
+def <- EHExplore_Interactions_Scatterplots(dfTeenGamb, "gamble", "sex")
+grid.arrange(grobs=def[c(1:5)],  ncol=2, nrow=3)
 
 summary(lm(gamble ~ ., dfTeenGamb))
+summary(lm(gamble ~ status*sex + income*sex + verbal*sex, dfTeenGamb))
 
 ```
 
