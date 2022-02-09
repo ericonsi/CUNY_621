@@ -1,0 +1,810 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "2/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(Hmisc)
+library(psych)
+library(tidyverse)
+library(skimr)
+library(purrr)
+library(tidyr)
+library(tidyverse)
+library(gridExtra)
+```
+
+
+```{r}
+dfTrain <- read.csv("D:\\RStudio\\621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+dfEval <- read.csv("D:\\RStudio\\621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+
+colnames(dfTrain)<-gsub("TEAM_","",colnames(dfTrain))
+
+dfTrain2 <- dfTrain
+summary(dfTrain)
+summary(dfEval)
+```
+
+### Initial Exploration
+
+We begin with an initial exporation of the dataset.
+
+```{r}
+dim(dfTrain)
+summary(dfTrain)
+skim(dfTrain)
+str(dfTrain)
+```
+
+#### Taking care of NA
+
+Batting_HPBA has too many so we remove it:
+
+```{r}
+dfTrain2 <- dfTrain2 %>%
+  dplyr::select(-BATTING_HBP) 
+
+```
+
+Before we impute the values for NAs, we need to ensure there isn't any kind of grouping effect for the records with NA. Fact that several columns have the same number of missings suggests there might be. So first we look to see if the missings are correlated: 
+
+```{r}
+
+dfTrain2 <- dfTrain2 %>%
+  mutate(Missing_Flag = ifelse(is.na(BATTING_SO),1,0))
+
+dfTrain3 <- dfTrain2 %>%
+  dplyr::filter(Missing_Flag == 0) %>%
+  dplyr::select(BATTING_SO, PITCHING_SO, BASERUN_CS, BASERUN_SB) 
+  
+
+summary(dfTrain3)
+
+```
+There is some cohort effect as there is complete duplication with pitching so and batting so, and some overlap with baserun cs.  Now lets impute the mean/median and see how well the new model performs vs the old:
+
+
+```{r}
+dfTrain_ImputedMedian <- data.frame(
+    sapply(dfTrain2, function(x) ifelse(is.na(x), median(x, na.rm = TRUE), x)))
+
+dfTrain_ImputedMean <- data.frame(
+    sapply(dfTrain2, function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x)))
+
+dfTrain_ImputedMean_NoCohort <- dfTrain_ImputedMean %>%
+  filter(Missing_Flag==0) %>%
+  dplyr::select(-Missing_Flag)
+
+dfTrain_ImputedMedian_NoCohort <- dfTrain_ImputedMedian %>%
+  filter(Missing_Flag==0) %>%
+  dplyr::select(-Missing_Flag)
+
+m1 <- lm(TARGET_WINS ~ ., dfTrain_ImputedMedian)
+m2 <- lm(TARGET_WINS ~ ., dfTrain_ImputedMedian_NoCohort)
+m3 <- lm(TARGET_WINS ~ ., dfTrain_ImputedMean)
+m4 <- lm(TARGET_WINS ~ ., dfTrain_ImputedMean_NoCohort)
+
+summary(m1)$adj.r.squared
+summary(m2)$adj.r.squared
+summary(m3)$adj.r.squared
+summary(m4)$adj.r.squared
+```
+There appears to be a minor effect. Imputing the mean to the other columns with NA and removing cohort records has a very small positive effect on the model.
+
+Now we can look at interactions between the "cohort" and other variables:
+
+```{r message=FALSE, warning=FALSE}
+
+EHExplore_Interactions_Scatterplots <- function(df, y, interaction) {
+
+library(ggsci)
+  
+plot_list <- list()
+
+df$Missing_Flag <- as.factor(df$Missing_Flag)
+
+for(i in 1:ncol(df)) {                              
+  p <- eval(substitute(ggplot(df, aes_string(df[ , i], y, color=interaction)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  #scale_color_brewer(palette="Set1") +
+  xlab("") +
+  theme(title = element_text(size=7)) +
+  scale_color_d3()+
+  scale_fill_d3()+
+  ggtitle(colnames(df)[i]), list(i=i)))
+  plot_list[[i]] <- p 
+}
+  return(plot_list)
+}
+
+library(patchwork)
+
+dfTmp <- dfTrain_ImputedMean %>%
+  mutate(Pitch_h_Under1500 = as.factor(ifelse(PITCHING_H<=1500, 1, 0)))
+
+z1 <- EHExplore_Interactions_Scatterplots(dfTrain_ImputedMean, "TARGET_WINS", "Missing_Flag")
+
+grid.arrange(grobs=z1[c(2:7)],  ncol=2, nrow=3)
+grid.arrange(grobs=z1[c(8:13)],  ncol=2, nrow=3)
+grid.arrange(grobs=z1[c(14:16)],  ncol=2, nrow=3)
+
+```
+
+The interaction analysis suggests that the cohort is not random - there are numerous interactions with many other variables, some of which are quite counterinutitive (team pitching H).  So we could either do a random effects/flag/interactions or toss them.  Becuase bad data is not reproducible I will toss, at the expense of better predicitons if I can identify the cohort in the eval data.
+
+No we can look at the stats in ur new dataset.
+
+```{r}
+
+summary(dfTrain_ImputedMean_NoCohort)
+
+```
+
+
+### Now we can do Outlier Analysis, and check to see if zeroes may be coded as nas
+
+```{r}
+
+EHExplore_Outliers_Boxplots <- function(df, size="small")
+{
+  
+s <- 6
+if (size=="large") {
+  s <- 10
+}
+plot_list2 <- list()
+
+for(i in 1:ncol(df)) {     
+  
+  qp <- toString(head(sort(df[,i]),5))
+  qz <- toString(tail(sort(df[,i]),5))
+  qk <- str_c(qp, "\\\n", qz)
+  
+  p <- eval(substitute(ggplot(df, aes(df[,i])) +
+          coord_flip() +  
+          xlab(colnames(df)[i])  +
+          ylab(qk) +
+          theme(axis.title.x = element_text(size = s), axis.title.y = element_text(size = 9), axis.text.x = element_blank(), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray"))  + 
+          geom_boxplot(), list(i=i)))
+  plot_list2[[i]] <- p 
+}
+return (plot_list2)
+}
+
+z <- EHExplore_Outliers_Boxplots(dfTrain_ImputedMean_NoCohort, "small")
+wrap_plots(z)
+
+```
+
+```{r}
+
+
+EHExplore_Distributions_Histograms <- function(df, size = "small")
+{
+s <- 6
+if (size=="large") {
+  s <- 10
+}
+
+plot_list2 <- list()
+
+for(i in 1:ncol(df)) {     
+  
+  qp <- toString(head(sort(df[,i]),5))
+  qz <- toString(tail(sort(df[,i]),5))
+  qk <- str_c("L: ", qp, "\\\n", "H: ", qz)
+  
+  p <- eval(substitute(ggplot(df, aes(df[,i])) +
+          ylab(colnames(df)[i])  +
+          xlab(qk) +
+          theme(axis.title.x = element_text(size = s), axis.title.y = element_text(size = 9), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(size=8),  panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_blank(), panel.background = element_rect(fill = "slategray2", color="darkslategray"))  + 
+  geom_histogram(bins=100, fill="white", aes(y = stat(density))) +
+      geom_density(col = "red"), list(i=i)))
+  plot_list2[[i]] <- p 
+}
+return (plot_list2)
+}
+
+z6 <- EHExplore_Distributions_Histograms(dfTrain_ImputedMean_NoCohort, "small")
+wrap_plots(z6)
+```
+
+```{r}
+
+EHExplore_CombineGraphs_2 <- function(list1, list2) {
+  
+zz7 <- list()
+
+for(i in 1:length(list1)) {
+zz7[i*2-1] <- list1[i]
+zz7[i*2] <- list2[i]
+}
+return (zz7)
+}
+
+#zz1 <- EHExplore_CombineGraphs(z, z4, z6)
+
+#grid.arrange(grobs=zz1[c(1:16)],  ncol=4, nrow=4)
+#grid.arrange(grobs=zz1[c(17:32)],  ncol=4, nrow=4)
+
+```
+
+There are 4 categories where 0s may be nas:  Pitching and Batting HR and Pitching and batting SO.  We look more closely at these categories:
+
+```{r}
+dfTrain_ZeroAsNA <- dfTrain %>%
+dplyr::select(PITCHING_SO, PITCHING_HR, BATTING_SO, BATTING_HR)
+
+hist(dfTrain_ZeroAsNA)
+
+```
+
+We can check to see if the zeroes behave like nas or actual values.  We compare the interaction with Pitching_h in both cases.  They behave very differently, neither like the overall sample:
+
+```{r}
+
+dfTmp <- dfTrain_ImputedMean %>%
+  mutate(Zeros = as.factor(ifelse(PITCHING_SO <= 0, 1, 0)))
+
+z2 <- EHExplore_Interactions_Scatterplots(dfTmp, "TARGET_WINS", "Zeros")
+
+grid.arrange(z2[[11]], z1[[11]],  ncol=2, nrow=3)
+
+
+
+```
+Looking for other gorups,  Hard to say - there seems to be something about lower so being more negatively correlated with wins than later - but the ns may be small:
+
+
+```{r}
+
+dfTmp <- dfTrain_ImputedMean %>%
+  mutate(Zeros = as.factor(ifelse(PITCHING_SO <= 400 & PITCHING_SO >=0, 1, 0)))
+
+dfx <- dfTmp %>%
+  filter(Zeros==1)
+
+z2 <- EHExplore_Interactions_Scatterplots(dfTmp, "TARGET_WINS", "Zeros")
+
+grid.arrange(z2[[11]], z1[[11]],  ncol=2, nrow=3)
+
+
+
+```
+
+
+Will do nothing with outliers or na as zero for now
+
+### Second Exploration
+
+#### a. Dependent variable
+
+```{r}
+
+hist(dfTrain$TARGET_WINS, bins=20)
+
+head(sort(dfTrain$TARGET_WINS))
+
+dfTrain_ZeroWins <- dfTrain %>%
+  dplyr::filter(TARGET_WINS ==0)
+
+head(dfTrain_ZeroWins, 1)
+```
+
+Target_Wins appears normally distributed - the zero is suspicious but I'm going to leave it.
+
+#### b. Look at correlations throughout the variables and inspect multi-colinnearity
+
+```{r}
+
+
+dfCor <- as.data.frame(cor(dfTrain_ImputedMean_NoCohort))
+dfCor
+
+heatmap(as.matrix(dfCor), Rowv = NA, Colv = NA)   
+```
+
+Invsteigate suspicious HR category
+
+```{r}
+cor.test(dfTrain$PITCHING_HR, dfTrain$TARGET_WINS)
+
+ggplot(dfTrain, aes(PITCHING_HR, BATTING_HR, color=INDEX)) +
+  geom_point()
+```
+
+```{r}
+
+hist(dfTrain$PITCHING_HR, breaks=100)
+plot(dfTrain$PITCHING_HR, dfTrain$TARGET_WINS)
+
+```
+```{r}
+
+m1 <- lm(TARGET_WINS ~ PITCHING_HR, data=dfTrain)
+summary(m1)
+plot(m1)
+
+
+library(car) 
+influencePlot(m1, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+
+```
+
+```{r}
+
+dfTrain2 <- dfTrain[-c(1211,2233,299,1825, 832), ]
+cor.test(dfTrain2$PITCHING_HR, dfTrain2$TARGET_WINS)
+
+m2 <- lm(TARGET_WINS ~ PITCHING_HR, data=dfTrain2)
+summary(m2)
+plot(m2)
+
+library(car) 
+influencePlot(m2, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+```
+
+```{r}
+
+
+```
+```{r}
+
+summary(m1$residuals)
+describe(m1$residuals)
+
+dfTrain$Residuals <- m1$residuals
+dfTrain$Fitted <- m1$fitted.values
+
+
+
+```
+```{r}
+
+library(tidyverse)
+
+```
+```{r}
+
+dfTrain_WithoutHR <- dfTrain %>%
+  dplyr::filter(TARGET_WINS >=50 | PITCHING_HR!=0)
+
+hist(dfTrain_WithoutHR$PITCHING_HR)
+plot(dfTrain_WithoutHR$PITCHING_HR, dfTrain_WithoutHR$TARGET_WINS)
+  
+m3 <- lm(TARGET_WINS ~ PITCHING_HR, data=dfTrain_WithoutHR)
+summary(m3)
+plot(m3)
+
+
+library(car) 
+influencePlot(m3, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+
+
+```
+
+```{r}
+dfTrain_BiModal <- dfTrain %>%
+  mutate(HR_Low = if_else(PITCHING_HR<50,1,0)) %>%
+  mutate(HR_High = if_else(PITCHING_HR>=50,1,0))
+
+dfCor_BiModal <- as.data.frame(cor(dfTrain_BiModal))
+
+```
+
+```{r}
+
+m4 <- lm(TARGET_WINS ~ PITCHING_HR + HR_Low, data=dfTrain_BiModal)
+summary(m4)
+plot(m4)
+
+```
+```{r}
+
+dfHighHR <- dfTrain_BiModal %>%
+  dplyr::filter(HR_High ==1)
+
+dfLowHR <- dfTrain_BiModal %>%
+  dplyr::filter(HR_Low==1)
+
+t.test(dfLowHR$TARGET_WINS, dfHighHR$TARGET_WINS)
+
+m5 <- lm(TARGET_WINS ~ PITCHING_HR, data=dfHighHR)
+summary(m5)
+plot(m5)
+
+```
+```{r}
+dfCor_HR <- as.data.frame(cor(dfTrain_BiModal[-1], dfTrain_BiModal$PITCHING_HR)) 
+dfCor_Low <- as.data.frame(cor(dfTrain_BiModal[-1], dfTrain_BiModal$HR_Low))
+
+plot(dfTrain$BATTING_HR, dfTrain$PITCHING_HR)
+```
+
+```{r}
+
+dfTrain$HR_Diff <- dfTrain$PITCHING_HR -dfTrain$BATTING_HR
+hist(dfTrain$HR_Diff, breaks=100)
+
+describe(dfTrain$HR_Diff)
+
+```
+
+Sum of HR allowed greatly exceeds sum of HR hit
+
+```{r}
+
+
+
+```
+
+```{r}
+m6 <- lm(dfTrain$BATTING_HR ~ dfTrain$PITCHING_HR)
+summary(m6)
+plot(m6)
+```
+
+```{r}
+
+
+cor.test(dfTrain$BATTING_BB, dfTrain$PITCHING_BB)
+plot(dfTrain$BATTING_BB, dfTrain$PITCHING_BB)
+
+```
+
+c. look at relationships with Dependent variable
+
+```{r}
+
+dfTrain_ImputedMedian <- dfTrain_ImputedMean_NoCohort
+
+for(i in 2:ncol(dfTrain_ImputedMedian)) {                              
+  print(ggplot(dfTrain_ImputedMedian, aes(x = dfTrain_ImputedMedian[ ,i], y = dfTrain_ImputedMedian$TARGET_WINS)) +
+          xlab(colnames(dfTrain)[i])  +
+          stat_smooth(method=loess) +
+          geom_point())
+
+m <- lm(dfTrain_ImputedMedian$TARGET_WINS ~ dfTrain_ImputedMedian[ ,i])
+
+par(mfcol=c(2,2))
+print(summary(m))
+print(plot(m))
+}
+
+```
+
+```{r}
+
+dfTrain_ImputedMedian <- dfTrain_ImputedMean_NoCohort
+
+EHExplore_Correlations_Scatterplots <- function(df, y)
+{
+  plot_list <- list()
+  
+  for(i in 1:ncol(df)) {
+  
+    ct <- cor.test(df[,i], df[,y])
+    
+  xText <- str_c("Correlation: ", round(ct$estimate,2), "   p value: ", round(ct$p.value,2))
+    
+  p <- eval(substitute(ggplot(df, aes_string(x=df[[i]], y)) +
+  geom_point(fill="navy", color="white") +
+  geom_smooth(method = "loess", color="red", fill="lightcoral") +
+  ylab(y) +
+    xlab(xText) +
+    theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
+  ggtitle(colnames(df)[i]), list(i=i)))
+  plot_list[[i]] <- p 
+}
+  return(plot_list)
+}
+
+z4 <- EHExplore_Correlations_Scatterplots(dfTrain_ImputedMedian, "TARGET_WINS")
+
+grid.arrange(grobs=z4[c(2:11)],  ncol=3, nrow=5)
+#grid.arrange(grobs=z4[c(11:16)],  ncol=3, nrow=6)
+
+```
+
+```{r fig.height=12}
+
+zz1 <- list()
+
+for(i in 1:length(z)) {
+zz1[i*3-2] <- z[i]
+zz1[i*3-1] <- z6[i]
+zz1[i*3] <- z4[i]
+}
+
+grid.arrange(grobs=zz1[c(1:24)],  ncol=3, nrow=8)
+grid.arrange(grobs=zz1[c(25:48)],  ncol=3, nrow=8)
+#grid.arrange(grobs=zz1[c(25:36)],  ncol=3, nrow=4)
+#grid.arrange(grobs=zz1[c(37:48)],  ncol=3, nrow=4)
+
+```
+
+
+
+
+Trying a transformation on team fielding error. it improves it to some degree.
+
+```{r}
+
+dfTrain_ImputedMedian2 <- dfTrain_ImputedMedian %>%
+  mutate(sq = FIELDING_E^2)
+
+summary(lm(TARGET_WINS ~ FIELDING_E, dfTrain_ImputedMedian2))
+summary(lm(TARGET_WINS ~ FIELDING_E + sq, dfTrain_ImputedMedian2))
+
+
+```
+### Regression
+
+```{r}
+#Two mods made - team pitching has the square temr and intreaction between hits and dp
+
+par(mfcol=c(2,2))
+mod_2 <- lm(TARGET_WINS ~ ., data = dfTrain_ImputedMedian)
+summary(mod_2)
+plot(mod_2)
+
+library(MASS)
+step1 <- stepAIC(mod_2, trace=FALSE)
+summary(step1)
+```
+Understanding the role of double plays - remove the influence of hits:
+
+```{r}
+
+ggplot(dfTrain_ImputedMedian, aes(FIELDING_DP, PITCHING_H)) +
+  geom_point()
+
+ggplot(dfTrain, aes(FIELDING_DP, PITCHING_H)) +
+  geom_point()
+
+cor(dfTrain_ImputedMedian$FIELDING_DP, dfTrain_ImputedMedian$PITCHING_H)
+
+summary(lm(TARGET_WINS ~ FIELDING_DP + PITCHING_H, dfTrain))
+summary(lm(TARGET_WINS ~ FIELDING_DP + PITCHING_H, dfTrain_ImputedMedian))
+
+summary(lm(TARGET_WINS ~ FIELDING_DP*PITCHING_H, dfTrain))
+summary(lm(TARGET_WINS ~ FIELDING_DP*PITCHING_H, dfTrain_ImputedMedian))
+```
+The interaction temr makes a difference.
+
+Taking a log of Pitching_H:
+
+```{r}
+
+ggplot(dfTrain_ImputedMedian, aes(dfTrain_ImputedMedian$PITCHING_H)) +
+  geom_histogram(bins=100)
+
+dfTrain_ImputedMedian5 <- dfTrain_ImputedMedian2 %>%
+  mutate(logPitch_h = PITCHING_H^2)
+
+ggplot(dfTrain_ImputedMedian5, aes(logPitch_h, TARGET_WINS)) +
+          stat_smooth(method=loess) +
+          geom_point()
+
+m <- lm(TARGET_WINS ~ PITCHING_H + logPitch_h, dfTrain_ImputedMedian5)
+summary(m)
+plot(m)
+
+```
+
+A closer look at Pitching_h.  Taking out th outliers.
+
+```{r}
+
+
+dfTrain_ImputedMedian6 <- dfTrain_ImputedMedian5 %>%
+  dplyr::filter(PITCHING_H <= 1500)
+
+dfTrain_ImputedMedian7 <- dfTrain_ImputedMedian5 %>%
+  dplyr::filter(PITCHING_H > 2000)
+
+ggplot(dfTrain_ImputedMedian6, aes(PITCHING_H, TARGET_WINS)) +
+          stat_smooth(method=loess) +
+          geom_point()
+
+m <- lm(TARGET_WINS ~ PITCHING_H, dfTrain_ImputedMedian6)
+summary(m)
+plot(m)
+
+
+ggplot(dfTrain_ImputedMedian7, aes(PITCHING_H, TARGET_WINS)) +
+          stat_smooth(method=loess) +
+          geom_point()
+
+m <- lm(TARGET_WINS ~ PITCHING_H, dfTrain_ImputedMedian7)
+summary(m)
+plot(m)
+
+ggplot(dfTrain_ImputedMedian, aes(PITCHING_H, TARGET_WINS)) +
+          stat_smooth(method=loess) +
+          geom_point()
+
+m <- lm(TARGET_WINS ~ PITCHING_H, dfTrain_ImputedMedian)
+summary(m)
+plot(m)
+
+```
+
+Eliminting outliers has no effect - but show outliers seem to be grouped (compare new outliers with old):
+
+```{r}
+
+
+dfTrain_ImputedMedian_nooutliers <- dfTrain_ImputedMedian %>%
+  dplyr::filter(INDEX != 1211 & INDEX != 1342 & INDEX != 1810)
+
+m <- lm(TARGET_WINS ~ PITCHING_H, dfTrain_ImputedMedian_nooutliers)
+summary(m)
+plot(m)
+```
+looking for interactions:
+
+```{r}
+
+par(mfcol=c(2,2))
+
+dfTrain_ImputedMedian8 <- dfTrain_ImputedMedian %>%
+  mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0))
+
+dfTrain_ImputedMedian8$Pitch_h_Under1500 <- as.factor(dfTrain_ImputedMedian8$Pitch_h_Under1500)
+
+for(i in 2:ncol(dfTrain_ImputedMedian8)) {                              
+  print(ggplot(dfTrain_ImputedMedian8, aes(dfTrain_ImputedMedian8[,i], TARGET_WINS, color=Pitch_h_Under1500)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  ggtitle(colnames(dfTrain_ImputedMedian8)[i]))
+}
+```
+Similar analysis with the data missing records:
+
+```{r}
+
+dfTrain_flag <- dfTrain2 %>%
+  mutate(Missing_Flag = ifelse(is.na(BATTING_SO),1,0))
+
+mod_2 <- lm(TARGET_WINS ~ ., data = dfTrain_flag)
+step1 <- stepAIC(mod_2, trace=FALSE)
+summary(step1)
+
+
+```
+
+
+Only interaction appears with the fielding_errors. Hwoever, If we interact with itself it greatly improves the r squared.
+
+```{r}
+dfTrain_ImputedMedian9 <- dfTrain_ImputedMedian8 %>%
+  mutate(Pitch_h_squared = PITCHING_H^2) %>%
+    mutate(Pitch_h_log = log(PITCHING_H)) %>%
+    mutate(Pitch_h_sqrt = sqrt(PITCHING_H))
+
+summary(lm(TARGET_WINS ~ Pitch_h_squared, dfTrain_ImputedMedian9))
+summary(lm(TARGET_WINS ~ Pitch_h_log, dfTrain_ImputedMedian9))
+summary(lm(TARGET_WINS ~ Pitch_h_sqrt, dfTrain_ImputedMedian9))
+
+m <- lm(TARGET_WINS ~ PITCHING_H*Pitch_h_Under1500, dfTrain_ImputedMedian8)
+summary(m)
+plot(m)
+
+summary(lm(TARGET_WINS ~ FIELDING_E*Pitch_h_Under1500, dfTrain_ImputedMedian9))
+summary(lm(TARGET_WINS ~ FIELDING_E, dfTrain_ImputedMedian9))
+```
+Final Mods:
+
+```{r}
+
+dfTrain_ImputedMedian8$Pitch_h_Under1500 <- as.numeric(dfTrain_ImputedMedian8$Pitch_h_Under1500)
+
+dfTrain_Final <- dfTrain_ImputedMean_NoCohort %>%
+  mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0)) %>%
+  mutate(Prod_DP_H = FIELDING_DP*PITCHING_H) %>%
+  mutate(inter_H_Itself = PITCHING_H*Pitch_h_Under1500) %>%
+  mutate(Inter_H_Err = FIELDING_E*Pitch_h_Under1500) %>%
+  mutate(PITCHING_H = PITCHING_H) %>%
+  mutate(E_sq = FIELDING_E^2) %>%
+  mutate(BB_sq = -1*BATTING_BB^2) %>%
+  mutate(BHR_sq = -1*BATTING_HR^2) %>%
+  mutate(BSO_sq = -1*BATTING_SO^2) %>%
+  mutate(PH_sq = -1*PITCHING_H^2) %>%
+  mutate(PSO_sq = -PITCHING_SO^2) 
+
+dfTrain_ImputedMean$Missing_Flag <- as.numeric(dfTrain_ImputedMean$Missing_Flag)
+
+dfTrain_Final2 <- dfTrain_ImputedMean %>%
+  mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0)) %>%
+  mutate(Prod_DP_H = FIELDING_DP*PITCHING_H) %>%
+  mutate(inter_H_Itself = PITCHING_H*Pitch_h_Under1500) %>%
+  mutate(Inter_H_Err = FIELDING_E*Pitch_h_Under1500) %>%
+  mutate(E_sq = FIELDING_E^2) %>%
+  mutate(BB_sq = -1*BATTING_BB^2) %>%
+  mutate(BHR_sq = -1*BATTING_HR^2) %>%
+  mutate(BSO_sq = -1*BATTING_SO^2) %>%
+  mutate(PH_sq = -1*PITCHING_H^2) %>%
+  mutate(PSO_sq = -PITCHING_SO^2) %>%
+  mutate(Inter_h_Cohort = PITCHING_H*Missing_Flag) %>%
+  mutate(Inter_bb_Cohort = PITCHING_BB*Missing_Flag) %>%
+  mutate(Inter_hr_Cohort = PITCHING_HR*Missing_Flag) %>%
+  mutate(Inter_E_Cohort = FIELDING_E*Missing_Flag) %>%
+  mutate(Inter_bh_Cohort = BATTING_H*Missing_Flag) %>%
+  mutate(Inter_bhr_Cohort = BATTING_HR*Missing_Flag) %>%
+  mutate(Inter_bbb_Cohort = BATTING_BB*Missing_Flag) %>%
+  mutate(Inter_bs_Cohort = BASERUN_SB*Missing_Flag) 
+
+mod_2 <- lm(TARGET_WINS ~ ., data = dfTrain_ImputedMean_NoCohort)
+step2 <- stepAIC(mod_2, trace=FALSE)
+#summary(step2)
+
+par(mfcol=c(2,2))
+mod_2 <- lm(TARGET_WINS ~ ., data = dfTrain_Final)
+step3 <- stepAIC(mod_2, trace=FALSE)
+#summary(step3)
+
+mod_2 <- lm(TARGET_WINS ~ ., data = dfTrain_Final2)
+step4 <- stepAIC(mod_2, trace=FALSE)
+summary(step4)
+
+summary(step2)$adj.r.squared
+summary(step3)$adj.r.squared
+summary(step4)$adj.r.squared
+
+```
+Checking interactions with the missing vaolues cohort:
+
+```{r}
+
+```
+looking for interactions:
+
+```{r}
+
+```
+
+```{r}
+
+dfTrain_ImputedMean_NoCohort1 <- dfTrain_ImputedMean_NoCohort %>%
+  mutate(BB_sq = -1*BATTING_BB^2)
+
+summary(lm(TARGET_WINS ~ BATTING_BB, dfTrain_ImputedMean_NoCohort1))
+summary(lm(TARGET_WINS ~ BATTING_BB + BB_sq, dfTrain_ImputedMean_NoCohort1))
+
+
+```
+pitching SO has 20 zeroes which looks like missing values.  Also, eliminate the 0 wins record.
+
+```{r}
+
+x <- dfTrain_ImputedMean_NoCohort %>% 
+  filter(PITCHING_SO == 0)
+x
+
+```
+```{r}
+data(teengamb, package="faraway")
+dfTeenGamb <- teengamb
+
+qq <- EHExplore_Outliers_Boxplots(dfTeenGamb)
+qq1 <- EHExplore_Correlations_Scatterplots(dfTeenGamb, "gamble")
+qq2 <- EHExplore_Distributions_Histograms(dfTeenGamb)
+
+zz <- EHExplore_CombineGraphs3(qq,qq2,qq1)
+print 
+
+grid.arrange(grobs=zz[c(1:15)], ncol=3, nrow=5)
+
+summary(lm(gamble ~ ., dfTeenGamb))
+
+```
+

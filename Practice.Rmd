@@ -1,0 +1,167 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "4/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(openintro)
+library(tinytex)
+library(tidyverse)
+library(magrittr)
+library(RODBC)
+library(gridExtra)
+library(psych)
+library(moments)
+library(kableExtra)
+library(QuantPsyc)
+```
+
+# Interaction terms
+
+`
+
+#### The data is loaded into the database
+
+```{r db connect, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+
+# This is the connection string:
+
+strConnection <- paste0(
+  'Driver={ODBC Driver 13 for SQL Server};
+   Server=tcp:ehtmp.database.windows.net,1433;
+   Database=HC_A1C;
+   Encrypt=yes;
+   TrustServerCertificate=no;
+   Connection Timeout=30;
+   Uid=datany2021;
+   Pwd=MSinDS123;'
+)
+
+dbConnection <- odbcDriverConnect(strConnection)
+
+dfA1C <- sqlQuery(dbConnection, "SELECT * FROM tblA1C")
+dfA1C %<>%
+  mutate(A1CDropPerCent=-1*(MostrecentA1C - DiagA1C)/DiagA1C) %<>%
+  mutate(A1CDrop= -1*(MostrecentA1C - DiagA1C)) %>%
+  mutate(Improved = case_when(A1CDrop > 0 ~ 1,
+                           A1CDrop <= 0 ~ 0))  %>%
+  filter(A1CDrop<7.4)
+
+```
+
+Looking at interactions with Age
+
+```{r}
+
+mean(dfA1C$Age)
+sd(dfA1C$Age)
+
+ggplot(dfA1C, aes(Age, A1CDrop)) +
+  geom_point() +
+  stat_smooth(method = "loess")
+
+ggplot(dfA1C, aes(Age, DiagA1C)) +
+  geom_point() +
+  stat_smooth(method = "loess")
+
+m3 <- lm(A1CDrop ~ Age, dfA1C)
+summary(m3)
+
+dfA1C2 <- dfA1C %>%
+  mutate(AgeUnder53=case_when(Age <= 40 ~ 1,
+                           Age > 40 ~ 0)) %>%
+  mutate(Age53To65=case_when(Age > 40 & Age <= 60  ~ 1,
+                           Age < 40 | Age > 60 ~ 0))           
+  
+m4 <- lm(A1CDrop ~ AgeUnder53 + Age53To65, dfA1C2)
+summary(m4)
+
+  
+m5 <- lm(DiagA1C ~ Age, dfA1C)
+summary(m5)
+
+ggplot(dfA1C, aes(Age, group=Improved)) +
+  geom_boxplot() +
+  coord_flip()
+
+```
+
+```{r}
+
+dfBlack <- dfA1C %>%
+  filter(BlackOrNot==1)
+
+dfWhite <- dfA1C %>%
+  filter(BlackOrNot==0)
+
+ggplot(dfA1C, aes(A1CDrop, NumberofQTACS, color=BlackOrNot)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(dfBlack, aes(NumberofQTACS, A1CDrop)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ggtitle("Black")
+  
+
+ggplot(dfWhite, aes(NumberofQTACS, A1CDrop)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ggtitle("White")
+
+m1 <- lm(A1CDrop ~ NumberofQTACS*BlackOrNot, data=dfA1C)
+summary(m1)
+
+m4 <- lm(A1CDrop ~ NumberofQTACS + BlackOrNot, data=dfA1C)
+summary(m4)
+
+
+```
+```{r}
+
+dfA1C$BlackOrNot=as.factor(dfA1C$BlackOrNot)
+dfA1C$MaleOrNot=as.factor(dfA1C$MaleOrNot)
+dfA1C$Newly_Diagnosed=as.factor(dfA1C$Newly_Diagnosed)
+
+ggplot(dfA1C, aes(Age, A1CDrop, color=Newly_Diagnosed)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  ggtitle("White")
+
+m22 <- lm(A1CDrop ~ Age*MaleOrNot, data = dfA1C)
+summary(m22)
+
+m23 <- lm(A1CDrop ~ Age + MaleOrNot, data = dfA1C)
+summary(m23)
+
+ggplot(dfA1C, aes(Age, A1CDrop, color=MaleOrNot)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  ggtitle("White")
+
+
+ggplot(dfA1C, aes(NumberofQTACS, A1CDrop, color=MaleOrNot)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  ggtitle("White")
+
+ggplot(dfA1C, aes(NumberofQTACS, A1CDrop, color=BlackOrNot)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  ggtitle("White")
+
+
+m22 <- lm(A1CDrop ~ Age*MaleOrNot, data = dfA1C)
+summary(m22)
+
+m23 <- lm(A1CDrop ~ Age + MaleOrNot, data = dfA1C)
+summary(m23)
+
+m24 <- lm(A1CDrop ~ MaleOrNot*NumberofQTACS, data=dfA1C)
+summary(m24)
+```
+
+

@@ -1,0 +1,174 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "12/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(Hmisc)
+library(psych)
+```
+
+
+```{r}
+dfTrain <- read.csv("D:\\RStudio\\621\\Baseball\\Training.csv", header=TRUE)
+```
+
+```{r}
+pairs.panels(dfTrain[1:8])
+pairs.panels(dfTrain[9:17])
+dfCor <- as.data.frame(cor(dfTrain))
+```
+```{r}
+cor.test(dfTrain$TEAM_PITCHING_HR, dfTrain$TARGET_WINS)
+```
+
+```{r}
+
+hist(dfTrain$TEAM_PITCHING_HR, breaks=100)
+plot(dfTrain$TEAM_PITCHING_HR, dfTrain$TARGET_WINS)
+
+```
+```{r}
+
+m1 <- lm(TARGET_WINS ~ TEAM_PITCHING_HR, data=dfTrain)
+summary(m1)
+plot(m1)
+
+
+library(car) 
+influencePlot(m1, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+
+```
+
+```{r}
+
+dfTrain2 <- dfTrain[-c(1211,2233,299,1825, 832), ]
+cor.test(dfTrain2$TEAM_PITCHING_HR, dfTrain2$TARGET_WINS)
+
+m2 <- lm(TARGET_WINS ~ TEAM_PITCHING_HR, data=dfTrain2)
+summary(m2)
+plot(m2)
+
+library(car) 
+influencePlot(m2, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+```
+
+```{r}
+
+
+```
+```{r}
+
+summary(m1$residuals)
+describe(m1$residuals)
+
+dfTrain$Residuals <- m1$residuals
+dfTrain$Fitted <- m1$fitted.values
+
+
+
+```
+```{r}
+
+library(tidyverse)
+
+```
+```{r}
+
+dfTrain_WithoutHR <- dfTrain %>%
+  filter(TARGET_WINS >=50 | TEAM_PITCHING_HR!=0)
+
+hist(dfTrain_WithoutHR$TEAM_PITCHING_HR)
+plot(dfTrain_WithoutHR$TEAM_PITCHING_HR, dfTrain_WithoutHR$TARGET_WINS)
+  
+m3 <- lm(TARGET_WINS ~ TEAM_PITCHING_HR, data=dfTrain_WithoutHR)
+summary(m3)
+plot(m3)
+
+
+library(car) 
+influencePlot(m3, id.method='identify', main='Influence Plot', sub='Circle size is proportional to Cook’s distance')
+
+
+```
+
+```{r}
+dfTrain_BiModal <- dfTrain %>%
+  mutate(HR_Low = if_else(TEAM_PITCHING_HR<50,1,0)) %>%
+  mutate(HR_High = if_else(TEAM_PITCHING_HR>=50,1,0))
+
+dfCor_BiModal <- as.data.frame(cor(dfTrain_BiModal))
+
+```
+
+```{r}
+
+m4 <- lm(TARGET_WINS ~ TEAM_PITCHING_HR + HR_Low, data=dfTrain_BiModal)
+summary(m4)
+plot(m4)
+
+```
+```{r}
+
+dfHighHR <- dfTrain_BiModal %>%
+  filter(HR_High ==1)
+
+dfLowHR <- dfTrain_BiModal %>%
+  filter(HR_Low==1)
+
+t.test(dfLowHR$TARGET_WINS, dfHighHR$TARGET_WINS)
+
+m5 <- lm(TARGET_WINS ~ TEAM_PITCHING_HR, data=dfHighHR)
+summary(m5)
+plot(m5)
+
+```
+```{r}
+dfCor_HR <- as.data.frame(cor(dfTrain_BiModal[-1], dfTrain_BiModal$TEAM_PITCHING_HR)) 
+dfCor_Low <- as.data.frame(cor(dfTrain_BiModal[-1], dfTrain_BiModal$HR_Low))
+
+plot(dfTrain$TEAM_BATTING_HR, dfTrain$TEAM_PITCHING_HR)
+```
+
+```{r}
+
+dfTrain$HR_Diff <- dfTrain$TEAM_PITCHING_HR -dfTrain$TEAM_BATTING_HR
+hist(dfTrain$HR_Diff, breaks=100)
+
+describe(dfTrain$HR_Diff)
+
+```
+
+Sum of HR allowed greatly exceeds sum of HR hit
+
+```{r}
+
+
+
+```
+
+```{r}
+m6 <- lm(dfTrain$TEAM_BATTING_HR ~ dfTrain$TEAM_PITCHING_HR)
+summary(m6)
+plot(m6)
+```
+
+```{r}
+
+
+cor.test(dfTrain$TEAM_BATTING_BB, dfTrain$TEAM_PITCHING_BB)
+plot(dfTrain$TEAM_BATTING_BB, dfTrain$TEAM_PITCHING_BB)
+
+```
+
+```{r}
+
+hist(dfTrain$TARGET_WINS)
+```
+
