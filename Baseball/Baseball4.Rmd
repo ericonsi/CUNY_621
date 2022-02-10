@@ -350,6 +350,12 @@ plot(dfTrain$PITCHING_HR, dfTrain$TARGET_WINS)
 
 ```
 ```{r}
+EHModel_PrintSummary <- function(model)
+{
+  print(summary(model))
+  par(mfcol=c(2,2))
+  print(plot(model))
+}
 
 m1 <- lm(TARGET_WINS ~ PITCHING_HR, data=dfTrain)
 summary(m1)
@@ -507,7 +513,7 @@ print(plot(m))
 
 dfTrain_ImputedMedian <- dfTrain_ImputedMean_NoCohort
 
-EHExplore_Correlations_Scatterplots <- function(df, y)
+EHExplore_Correlations_Scatterplots <- function(df, y, flip=FALSE)
 {
   plot_list <- list()
   
@@ -518,14 +524,25 @@ EHExplore_Correlations_Scatterplots <- function(df, y)
     ct <- cor.test(df[,i], df[,y])
     
   xText <- str_c("Correlation: ", round(ct$estimate,2), "   p value: ", round(ct$p.value,2))
-    
-  p <- eval(substitute(ggplot(df, aes_string(x=df[[i]], y)) +
+  
+  x1 = df[[i]]
+  y1 =y
+  
+  if(flip)
+  {
+    x1=y
+    y1=df[[i]]
+  }
+  
+    p <- ggplot(df, aes_string(x1, y1)) +
   geom_point(fill="navy", color="white") +
   geom_smooth(method = "loess", color="red", fill="lightcoral") +
   ylab(y) +
     xlab(xText) +
     theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
-  ggtitle(colnames(df)[i]), list(i=i)))
+  ggtitle(colnames(df)[i])
+
+  p <- eval(substitute(p, list(i=i)))
   plot_list[[i]] <- p 
     
 }
@@ -903,7 +920,57 @@ grid.arrange(grobs=a4[c(85:93)], nrow=4, ncol=3)
 
 ```{r}
 
+data(happy, package="faraway")
+dfHappy <- happy
 
-print(a4[[77]])
+summary(happy)
+
+```
+
+```{r fig.height==8}
+
+w <- EHExplore_Outliers_Boxplots(dfHappy)
+w2 <- EHExplore_Distributions_Histograms(dfHappy)
+w3 <- EHExplore_Correlations_Scatterplots(dfHappy, y="happy")
+
+w4 <- EHExplore_IntegratePlotLists(w, w2, w3)
+
+grid.arrange(grobs=w4[c(1:15)], ncol=3, nrow=5)
+
+```
+
+```{r}
+m1 <- lm(happy  ~ ., dfHappy)
+EHModel_PrintSummary(m1)
+```
+```{r}
+wrap_plots(EHExplore_Interactions_Scatterplots(dfHappy, "happy", "sex"))
+
+```
+
+```{r}
+
+summary(lm(happy ~ work*sex + love + money, dfHappy))
+
+```
+
+```{r}
+
+data(divusa, package="faraway")
+dfDivusa <- divusa
+
+summary(dfDivusa)
+
+```
+```{r}
+
+wrap_plots(EHExplore_Correlations_Scatterplots(dfDivusa,"year", flip=TRUE))
+wrap_plots(EHExplore_Correlations_Scatterplots(dfDivusa,"divorce"))
+
+```
+
+```{r}
+
+EHModel_PrintSummary(lm(divorce ~ ., dfDivusa))
 ```
 
