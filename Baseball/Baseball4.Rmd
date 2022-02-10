@@ -18,12 +18,13 @@ library(purrr)
 library(tidyr)
 library(tidyverse)
 library(gridExtra)
+library(lubridate)
 ```
 
 
 ```{r}
 
-location <- "work"
+location <- "home"
 
 if (location == "work"){
 dfTrain <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\Rstudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
@@ -113,6 +114,8 @@ Now we can look at interactions between the "cohort" and other variables:
 
 EHExplore_Interactions_Scatterplots <- function(df, y, interaction) {
 
+df <- select_if(df, is.numeric)
+  
 df[,interaction] <- as.factor(df[,interaction])
   
 library(ggsci)
@@ -120,9 +123,7 @@ library(ggsci)
 plot_list <- list()
 
 for(i in 1:ncol(df)) {     
-    if(is.numeric(df[,i]))
-  {
-      
+   
   p <- eval(substitute(ggplot(df, aes_string(df[ , i], y, color=interaction)) +
   geom_point() +
   geom_smooth(method = "lm", se=FALSE) +
@@ -133,7 +134,6 @@ for(i in 1:ncol(df)) {
   ggtitle(colnames(df)[i]), list(i=i)))
   plot_list[[i]] <- p 
   
-    }
 }
   return(plot_list)
 }
@@ -168,6 +168,8 @@ summary(dfTrain_ImputedMean_NoCohort)
 
 EHExplore_Outliers_Boxplots <- function(df, size="small")
 {
+
+df <- select_if(df, is.numeric)
   
 s <- 7
 if (size=="large") {
@@ -176,9 +178,6 @@ if (size=="large") {
 plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
-  
-  if(is.numeric(df[,i]))
-  {
   
   qp <- toString(head(sort(round(df[,i],2)),5))
   qz <- toString(tail(sort(round(df[,i],2)),5))
@@ -192,7 +191,7 @@ for(i in 1:ncol(df)) {
           geom_boxplot(), list(i=i)))
   plot_list2[[i]] <- p 
   
-  }
+  
 }
 return (plot_list2)
 }
@@ -208,6 +207,9 @@ wrap_plots(z)
 
 EHExplore_Distributions_Histograms <- function(df, size = "small", nbins = 100)
 {
+  
+df <- select_if(df, is.numeric)
+    
 s <- 7
 if (size=="large") {
   s <- 10
@@ -216,9 +218,6 @@ if (size=="large") {
 plot_list2 <- list()
 
 for(i in 1:ncol(df)) {     
-  
-    if(is.numeric(df[,i]))
-  {
   
   qp <- toString(head(sort(round(df[,i],2)),5))
   qz <- toString(tail(sort(round(df[,i],2)),5))
@@ -232,7 +231,6 @@ for(i in 1:ncol(df)) {
       geom_density(col = "red"), list(i=i)))
   plot_list2[[i]] <- p 
   
-    }
 }
 return (plot_list2)
 }
@@ -276,7 +274,7 @@ We can check to see if the zeroes behave like nas or actual values.  We compare 
 ```{r}
 
 dfTmp <- dfTrain_ImputedMean %>%
-  mutate(Zeros = as.factor(ifelse(PITCHING_SO <= 0, 1, 0)))
+  mutate(Zeros = ifelse(PITCHING_SO <= 0, 1, 0))
 
 z2 <- EHExplore_Interactions_Scatterplots(dfTmp, "TARGET_WINS", "Zeros")
 
@@ -291,7 +289,7 @@ Looking for other gorups,  Hard to say - there seems to be something about lower
 ```{r}
 
 dfTmp <- dfTrain_ImputedMean %>%
-  mutate(Zeros = as.factor(ifelse(PITCHING_SO <= 400 & PITCHING_SO >=0, 1, 0)))
+  mutate(Zeros = ifelse(PITCHING_SO <= 400 & PITCHING_SO >=0, 1, 0))
 
 dfx <- dfTmp %>%
   filter(Zeros==1)
@@ -513,10 +511,9 @@ EHExplore_Correlations_Scatterplots <- function(df, y)
 {
   plot_list <- list()
   
+  df <- select_if(df, is.numeric)
+  
   for(i in 1:ncol(df)) {
-    
-      if(is.numeric(df[,i]))
-  {
   
     ct <- cor.test(df[,i], df[,y])
     
@@ -530,7 +527,6 @@ EHExplore_Correlations_Scatterplots <- function(df, y)
     theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
   ggtitle(colnames(df)[i]), list(i=i)))
   plot_list[[i]] <- p 
-      }
     
 }
   return(plot_list)
@@ -844,7 +840,7 @@ grid.arrange(grobs=abc[c(1:15)],  ncol=3, nrow=5)
 ```{r}
 
 def <- EHExplore_Interactions_Scatterplots(dfTeenGamb, "gamble", "sex")
-grid.arrange(grobs=def[c(1:5)],  ncol=2, nrow=3)
+grid.arrange(grobs=def[c(2:5)],  ncol=2, nrow=3)
 
 summary(lm(gamble ~ ., dfTeenGamb))
 summary(lm(gamble ~ status*sex + income*sex + verbal*sex, dfTeenGamb))
@@ -878,6 +874,10 @@ dfA1C %<>%
   filter(A1CDrop<7.4)
 
 ```
+```{r}
+skim(dfA1C)
+
+```
 
 
 ```{r}
@@ -895,9 +895,15 @@ grid.arrange(grobs=a4[c(37:48)], nrow=4, ncol=3)
 grid.arrange(grobs=a4[c(49:60)], nrow=4, ncol=3)
 grid.arrange(grobs=a4[c(61:72)], nrow=4, ncol=3)
 grid.arrange(grobs=a4[c(73:84)], nrow=4, ncol=3)
-grid.arrange(grobs=a4[c(85:96)], nrow=4, ncol=3)
-grid.arrange(grobs=a4[c(97:99)], nrow=1, ncol=3)
+grid.arrange(grobs=a4[c(85:93)], nrow=4, ncol=3)
+
 
 ```
 
+
+```{r}
+
+
+print(a4[[77]])
+```
 
