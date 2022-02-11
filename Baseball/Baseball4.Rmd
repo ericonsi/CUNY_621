@@ -870,7 +870,7 @@ summary(lm(gamble ~ status*sex + income*sex + verbal*sex, dfTeenGamb))
 library(RODBC)
 
 strConnection <- paste0(
-  'Driver={ODBC Driver 17 for SQL Server};
+  'Driver={ODBC Driver 13 for SQL Server};
    Server=tcp:ehtmp.database.windows.net,1433;
    Database=HC_A1C;
    Encrypt=yes;
@@ -973,4 +973,32 @@ wrap_plots(EHExplore_Correlations_Scatterplots(dfDivusa,"divorce"))
 
 EHModel_PrintSummary(lm(divorce ~ ., dfDivusa))
 ```
+
+```{r}
+
+dfHomeSales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+
+zs <- EHExplore_Outliers_Boxplots(dfHomeSales)
+zs1 <- EHExplore_Distributions_Histograms(dfHomeSales)
+zs2 <- EHExplore_Correlations_Scatterplots(dfHomeSales,"SalePrice")
+
+zs4 <- EHExplore_IntegratePlotLists(zs, zs1, zs2)
+
+grid.arrange(grobs=zs4[c(1:12)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(13:24)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(25:36)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(37:48)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(49:60)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(61:72)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(73:84)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(85:96)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(97:108)], ncol=3, now=4)
+grid.arrange(grobs=zs4[c(109:114)], ncol=3, now=2)
+
+
+```
+
 
