@@ -1001,4 +1001,23 @@ grid.arrange(grobs=zs4[c(109:114)], ncol=3, now=2)
 
 ```
 
+```{r}
+
+
+
+EHExplore_Interactions_Scatterplots(dfHomeSales, "SalePrice", "OverallQual")
+EHExplore_Interactions_Scatterplots(dfHomeSales, "SalePrice", "OverallCond")
+
+summary(lm(SalePrice ~ OverallQual + GrLivArea, dfHomeSales))
+summary(lm(SalePrice ~ OverallQual*GrLivArea, dfHomeSales))
+
+
+```
+
+```{r}
+
+
+
+```
+
 
