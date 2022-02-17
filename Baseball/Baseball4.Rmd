@@ -2,7 +2,7 @@
 title: "Untitled"
 author: "Eric Hirsch"
 date: "2/20/2021"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -20,6 +20,23 @@ library(tidyverse)
 library(gridExtra)
 library(lubridate)
 ```
+
+### Purpose of Assignment
+
+The purpose of this assignment is to explore, analyze and model a data set containing approximately 2200 records, each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
+
+#### Summary
+
+This data set offers a number of challenges.
+
+1.  Groupings - Our analysis is hampered by presumed hidden groupings within the dataset which may render some observations dependent on others (groupings by team, by era of baseball, etc.)  
+
+One grouping that can be shown to have an impact is a cohort of 102 records with missing values for both strikeouts and stolen bases. This cohort shows clear interaction with the other variables though it is not clear why.
+
+2. There is a high degree of multicollinearity.
+
+3. At Least one column is implausible - Home runs allowed is not only highly correlated with Home Runs made (.92) but over 50% of the values are an exact match.
+
 
 
 ```{r}
@@ -241,16 +258,6 @@ wrap_plots(z6)
 
 ```{r}
 
-EHExplore_CombineGraphs_2 <- function(list1, list2) {
-  
-zz7 <- list()
-
-for(i in 1:length(list1)) {
-zz7[i*2-1] <- list1[i]
-zz7[i*2] <- list2[i]
-}
-return (zz7)
-}
 
 #zz1 <- EHExplore_CombineGraphs(z, z4, z6)
 
@@ -331,7 +338,18 @@ Target_Wins appears normally distributed - the zero is suspicious but I'm going 
 dfCor <- as.data.frame(cor(dfTrain_ImputedMean_NoCohort))
 dfCor
 
-heatmap(as.matrix(dfCor), Rowv = NA, Colv = NA)   
+heatmap(as.matrix(dfCor), Rowv = NA, Colv = NA) 
+
+library(corrplot)
+my_matrix <- dfTrain_ImputedMean_NoCohort[]
+cor_res <- cor(my_matrix, use = "na.or.complete")
+corrplot(cor_res,
+type = "upper",
+order = "original",
+tl.col = "black",
+tl.srt = 45,
+tl.cex = 0.55)
+
 ```
 
 Invsteigate suspicious HR category
@@ -985,21 +1003,54 @@ zs <- EHExplore_Outliers_Boxplots(dfHomeSales)
 zs1 <- EHExplore_Distributions_Histograms(dfHomeSales)
 zs2 <- EHExplore_Correlations_Scatterplots(dfHomeSales,"SalePrice")
 
-zs4 <- EHExplore_IntegratePlotLists(zs, zs1, zs2)
+zs48 <- EHExplore_IntegratePlotLists(zs, zs1, zs2)
 
-grid.arrange(grobs=zs4[c(1:12)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(13:24)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(25:36)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(37:48)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(49:60)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(61:72)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(73:84)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(85:96)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(97:108)], ncol=3, now=4)
-grid.arrange(grobs=zs4[c(109:114)], ncol=3, now=2)
+grid.arrange(grobs=zs48[c(1:12)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(13:24)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(25:36)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(37:48)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(49:60)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(61:72)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(73:84)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(85:96)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(97:108)], ncol=3, now=4)
+grid.arrange(grobs=zs48[c(109:114)], ncol=3, now=2)
 
 
 ```
+
+```{r}
+
+zs4[[12]]
+
+dftmp <- dfHomeSales %>%
+  filter(LotArea<20000)
+
+q <- EHExplore_Correlations_Scatterplots(dftmp, "SalePrice")
+scatterplot(dftmp$LotArea,dftmp$SalePrice)
+
+q[[4]]
+
+dftmp2 <- dfHomeSales %>%
+  mutate(biglot = as.factor(ifelse(LotArea>10000,1,0)))
+
+ggplot(dftmp2, aes(YearBuilt, SalePrice, color=biglot)) +
+  geom_point()
+
+dftmp3 <- dfHomeSales %>%
+  mutate(DecadeBuilt = round(YearBuilt/10,0)) %>%
+  group_by(DecadeBuilt) %>%
+  summarize(MeanLotArea = round(mean(LotArea)), MeanSalePrice=round(mean(SalePrice)))
+
+ggplot(dftmp3, aes(DecadeBuilt, MeanLotArea)) +
+  geom_line() +
+  ggplot(dftmp3, aes(DecadeBuilt, MeanSalePrice)) +
+  geom_line(color = "blue")
+
+
+```
+
+
 
 ```{r}
 
@@ -1016,8 +1067,47 @@ summary(lm(SalePrice ~ OverallQual*GrLivArea, dfHomeSales))
 
 ```{r}
 
+zs24 <- EHExplore_Correlations_Scatterplots(dfHomeSales,"YearBuilt", flip=TRUE)
+
+grid.arrange(grobs=zs24[c(1:9)], ncol=3)
+grid.arrange(grobs=zs24[c(10:18)], ncol=3)
+grid.arrange(grobs=zs24[c(19:27)], ncol=3)
+grid.arrange(grobs=zs24[c(28:36)], ncol=3)
+grid.arrange(grobs=zs24[c(37:38)], ncol=3)
 
 
 ```
 
+```{r}
+data(gala, package="faraway")
+dfGala <- gala %>%
+  dplyr::select(-Endemics)
+
+summary(dfGala)
+
+```
+
+```{r}
+
+qq <- EHExplore_Outliers_Boxplots(dfGala)
+qq2 <- EHExplore_Correlations_Scatterplots(dfGala, "Species")
+qq1 <- EHExplore_Distributions_Histograms(dfGala, nbins=50)
+
+abc <- EHExplore_IntegratePlotLists(qq,qq1,qq2)
+grid.arrange(grobs=abc[c(1:9)],  ncol=3)
+grid.arrange(grobs=abc[c(10:18)],  ncol=3)
+
+
+```
+```{r}
+
+summary(lm(Species ~ ., dfGala))
+summary(lm(Species ~ Adjacent, dfGala))
+
+
+dfCor <- as.data.frame(cor(dfGala))
+dfCor
+
+heatmap(as.matrix(dfCor), Rowv = NA, Colv = NA)
+```
 
