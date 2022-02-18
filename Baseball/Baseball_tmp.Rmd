@@ -479,13 +479,15 @@ pitching_h - deal with odd behavior
 ```{r}
 
 dfPH <- dfTrain2 %>%
-  dplyr::select(TARGET_WINS, PITCHING_H) %>%
+  dplyr::select(TARGET_WINS, PITCHING_H)
+  
+dfPH2 <- dfPH %>%
   dplyr::filter(PITCHING_H <= 3000)
 
-x1 <- EHExplore_Correlations_Scatterplots(dfTrain, "TARGET_WINS")
-x2 <- EHExplore_Correlations_Scatterplots(dfPH, "TARGET_WINS")
+x1 <- EHExplore_Correlations_Scatterplots(dfPH, "TARGET_WINS")
+x2 <- EHExplore_Correlations_Scatterplots(dfPH2, "TARGET_WINS")
 
-grid.arrange(x1[[2]], x2[[2]], ncol=2, top="Pitching_H Against Wins, All Records (leftt) and Hits Over 3000 (right)", bottom="Fig.6")
+grid.arrange(x1[[2]], x2[[2]], ncol=2, top="Pitching_H Against Wins, All Records (leftt) and Only Hits Under 3000 (right)", bottom="Fig.6")
 
 
 dfTrain2 <- dfTrain2 %>%
@@ -527,8 +529,9 @@ Home runs - deal with implausibility (drop pitch)
 ```{r}
 
 a <- ggplot(dfTrain2, aes(BATTING_HR, PITCHING_HR)) +
-        geom_point() +
         EHTheme() +
+  geom_point(fill="navy", color="white") +
+  geom_smooth(method = "loess", color="red", fill="lightcoral") +
   ggtitle("Batting_HR vs Ptching_HR")
   
  grid.arrange(a, bottom="Fig. 7") 
@@ -682,7 +685,7 @@ Now we make predictions
 makePredictions <- function(m)
 {
 predictions <- as.data.frame(predict(m,newdata=dfEval2))
-write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictionsBB.csv")
+#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictionsBB.csv")
 }
 
 makePredictions(step2)
