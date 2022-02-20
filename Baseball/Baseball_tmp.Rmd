@@ -38,6 +38,7 @@ dfTrain <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\Rstudio\\CUNY_621\\Basebal
 dfEval <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
 } else
 {
+#dfTrain <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", h#dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
 dfTrain <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
 dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
 }
