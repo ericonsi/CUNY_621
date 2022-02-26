@@ -532,7 +532,7 @@ a <- ggplot(dfTrain2, aes(BATTING_HR, PITCHING_HR)) +
         EHTheme() +
   geom_point(fill="navy", color="white") +
   geom_smooth(method = "loess", color="red", fill="lightcoral") +
-  ggtitle("Batting_HR vs Ptching_HR")
+  ggtitle("Batting_HR vs Pitching_HR")
   
  grid.arrange(a, bottom="Fig. 7") 
   
