@@ -20,24 +20,42 @@ library(gridExtra)
 library(MASS)
 ```
 
-### Distinguishing MCAR from MAR
+### Eliminating a column from the database
 
-If data is mcar, we can safely discard records or columns with NA (if there aren't many).  If data is MAR, we need to preserve them and impute a value.  How can we distinguish between them?
+When is it safe to eliminate a column from the database because of the presence of NA's?
 
 I will be using the kangaroo skull dataset from LMR (kanga) to investigate these questions, focusing particularly on palate.width because it has the most missing values. 
-
 ```{r}
-#Uses the NANIAR package
-data(kanga, package="faraway")
-qqq <- EHData::EHSummarize_MissingValues(kanga)
-print(qqq[[1]])
+
+#install.packages("NHANES")
+library(NHANES)
 
 ```
 
 
-Here are possible methods for gaining insight into the issue, using the kanga dataset from LMR:
 
-First we run OLS on the dataset with and without the column at issue.  The column is not significant and adjusted R-squared improves when we remove it.
+```{r}
+
+dfV <- read.csv("C:\\users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\kanga_files\\Vehicles.txt", header = TRUE)
+#Uses the NANIAR package
+data(kanga, package="faraway")
+
+#install.packages("NHANES")
+library(NHANES)
+library(dplyr)
+
+#make a selection
+dfH <- NHANES %>% dplyr::select(Age,AgeDecade,Education,Poverty,Work,LittleInterest,Depressed,BMI,Pulse,BPSysAve,BPDiaAve,DaysPhysHlthBad,PhysActiveDays)
+
+
+
+summary(dfH)
+qqq <- EHData::EHSummarize_MissingValues(dfH)
+print(qqq[[1]])
+
+```
+
+First we run OLS on the dataset with and without the column at issue.  The column is not significant and adjusted R-squared __*improves*__ when we remove it so it seems like a no-brainer.
 
 ```{r}
 
@@ -48,18 +66,68 @@ kanga1 <- kanga %>%
 
 summary(lm(ramus.height ~ ., kanga1))
 
+kanga1 <- kanga %>%
+  dplyr::select(-"occipital.depth")
+
+summary(lm(ramus.height ~ ., kanga1))
+
 ```
-However, if the missing values are MAR, not MCAR, then we may lose information about 
+The problem is, if the missing values are MAR, not MCAR, then we may lose valuable information. For example,  
 
 1. Create a flag for missing values and look for interactions.  If there are significant interactions we might discard the column but retain the flag - however, here we see only minor interactions.
 
 ```{r}
+E_Interactions_Scatterplots <- function(df, y, interaction) {
+  
+  library(ggsci)
+  
+  df <- select_if(df, is.numeric)
+  
+  df[,interaction] <- as.factor(df[,interaction])
+  
+  plot_list <- list()
+  
+  for(i in 1:ncol(df)) { 
+    
+    print(colnames(df)[i])
+    
+    p <- eval(substitute(ggplot(df, aes_string(df[,i], y, color=interaction)) +
+                           geom_point(alpha=.1) +
+                           geom_smooth(method = "lm") +
+                           xlab("") +
+                           theme(title = element_text(size=7), axis.title.x = element_text(size = 7), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), panel.grid.major.x = element_line(color="gray"), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
+                           scale_color_d3()+
+                           scale_fill_d3()+
+                           ggtitle(colnames(df)[i]), list(i=i)))
+    plot_list[[i]] <- p 
+    
+  }
+  return(plot_list)
+}
 
-kanga2 <- kanga %>%
-  dplyr::mutate(PW_flag = ifelse(is.na(palate.width), 1, 0))
+```
+
+
+```{r}
+
+#kanga2 <- kanga %>%
+#  dplyr::mutate(OD_flag = ifelse(is.na(mandible.length), 1, 0))
                 
-q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "PW_flag")
-grid.arrange(grobs=q[c(1:16)], ncol=4)
+#q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "OD_flag")
+#grid.arrange(grobs=q[c(1:16)], ncol=4)
+#q[[1]]
+
+dfH2 <- as.data.frame(dfH) %>%
+  dplyr::mutate(D_flag = ifelse(is.na(Depressed), 1, 0))
+
+xx <- na.omit(dfH2)
+
+
+q4 <- E_Interactions_Scatterplots(dfH2, "BMI", "D_flag")
+library(patchwork)
+
+wrap_plots(q4)
+
 ```
 
 2. Impute missing values and look for significant differences in R-squared (there will likely be some minor difference because single imputation has an affect on variance).  Here we see little difference.
@@ -82,7 +150,7 @@ kanga3 <- na.omit(kanga2)
 4. Look at correlations between the column with missing values and other variables. Here we see significant multicollinearity:
 
 ```{r}
-q <- EHData::EHExplore_TwoContinuousColumns_Scatterplots(kanga, y="palate.width")
+q <- EHData::EHExplore_TwoContinuousColumns_Scatterplots(kanga, y="occipital.depth")
 grid.arrange(grobs=q[c(1:16)], ncol=4)
 ```
 
