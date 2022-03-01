@@ -1,35 +1,91 @@
 ---
-title: "Untitled"
+title: "CUNY 621, Discussion 5"
 author: "Eric Hirsch"
 date: "3/1/2022"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
+
 ```{r}
 
 library(tidyverse)
 library(EHData)
 library(faraway)
-```
-
-```{r}
-
 data(kanga, package="faraway")
 library(tidyverse)
 library(gridExtra)
-summary(kanga)
 library(MASS)
+```
 
-kanga2 <- kanga %>%
-  dplyr::mutate(flag = ifelse(is.na(palate.width), 1, 0))
-                
-q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "flag")
-grid.arrange(grobs=q[c(1:16)], ncol=4)
+### Distinguishing MCAR from MAR
 
-qq <- EHData::EHPrepare_MissingValues_Imputation(df=kanga2, y="ramus.height")
+If data is mcar, we can safely discard records or columns with NA (if there aren't many).  If data is MAR, we need to preserve them and impute a value.  How can we distinguish between them?
+
+I will be using the kangaroo skull dataset from LMR (kanga) to investigate these questions, focusing particularly on palate.width because it has the most missing values. 
+
+```{r}
+#Uses the NANIAR package
+data(kanga, package="faraway")
+qqq <- EHData::EHSummarize_MissingValues(kanga)
+print(qqq[[1]])
 
 ```
 
+
+Here are possible methods for gaining insight into the issue, using the kanga dataset from LMR:
+
+First we run OLS on the dataset with and without the column at issue.  The column is not significant and adjusted R-squared improves when we remove it.
+
+```{r}
+
+summary(lm(ramus.height ~ ., kanga))
+
+kanga1 <- kanga %>%
+  dplyr::select(-"palate.width")
+
+summary(lm(ramus.height ~ ., kanga1))
+
+```
+However, if the missing values are MAR, not MCAR, then we may lose information about 
+
+1. Create a flag for missing values and look for interactions.  If there are significant interactions we might discard the column but retain the flag - however, here we see only minor interactions.
+
+```{r}
+
+kanga2 <- kanga %>%
+  dplyr::mutate(PW_flag = ifelse(is.na(palate.width), 1, 0))
+                
+q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "PW_flag")
+grid.arrange(grobs=q[c(1:16)], ncol=4)
+```
+
+2. Impute missing values and look for significant differences in R-squared (there will likely be some minor difference because single imputation has an affect on variance).  Here we see little difference.
+
+```{r}
+
+qq <- EHData::EHPrepare_MissingValues_Imputation(df=kanga2, y="ramus.height")
+```
+
+3. Look for overlap among missing values. Here we see little overlap.
+
+```{r}
+
+qqq <- EHData::EHSummarize_MissingValues(kanga2)
+print(qqq[[2]])
+
+kanga3 <- na.omit(kanga2)
+
+```
+4. Look at correlations between the column with missing values and other variables. Here we see significant multicollinearity:
+
+```{r}
+q <- EHData::EHExplore_TwoContinuousColumns_Scatterplots(kanga, y="palate.width")
+grid.arrange(grobs=q[c(1:16)], ncol=4)
+```
+
+```
+
+Records with missing values make up 32% of the database.  What is the best strategy here? 
