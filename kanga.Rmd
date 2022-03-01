@@ -1,0 +1,35 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+
+library(tidyverse)
+library(EHData)
+library(faraway)
+```
+
+```{r}
+
+data(kanga, package="faraway")
+library(tidyverse)
+library(gridExtra)
+summary(kanga)
+library(MASS)
+
+kanga2 <- kanga %>%
+  dplyr::mutate(flag = ifelse(is.na(palate.width), 1, 0))
+                
+q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "flag")
+grid.arrange(grobs=q[c(1:16)], ncol=4)
+
+qq <- EHData::EHPrepare_MissingValues_Imputation(df=kanga2, y="ramus.height")
+
+```
+
