@@ -1,0 +1,129 @@
+---
+title: "What’s so Great about Heteroscedasticity?"
+author: "Eric Hirsch"
+date: "2/27/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, warnings=FALSE, messages=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings=FALSE, messages=FALSE)
+
+library(lmtest)
+```
+```{r, warnings=FALSE, messages=FALSE}
+
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+
+```
+<font size=3>Many data scientists would say __nothing__ is great about heteroscedasticity. In fact, some regard it like a skin rash – unexpected, inconvenient and a little embarrassing.  So they immediately throw at it whatever random ointments they find in the medicine cabinet and hope it goes away.
+
+But heteroscedasticity isn’t a problem with our data, it’s a feature. It’s interesting, and depending on its origin, it may tell us something important - perhaps even more important than the precision we are losing by not having constant variance.
+
+### What is Heteroscedasticity
+Heteroscedasticity refers to situations in which the variance of the residuals is unequal over the range of fitted values. While there are specific tests for it (e.g. Breusch-Pagan), when heteroscedasticity is present there is generally a patterning you can see in a scatterplot of residuals against fitted values. For example, we might see a cone shape, which tells us that variance is increasing as fitted values increase.  It is precisely this patterning that tells us there may be some relationships to discover within our data.
+
+### Why is it Regarded as a Problem
+The absence of heteroscedasticity is a fundamental assumption of Ordinary Least Squares regression.  When this assumption is violated, those aspects of our regression results that depend on constant variance (p-values, t=tests, F-tests, standard errors) are not trustworthy.  This can make statistical inference very difficult. On the other hand, our coefficients remain unbiased.
+
+So when heteroscedasticity is present, we are inhibited about making claims about the precision of our coefficients.  However, by contrast, we are more empowered to draw inferences about shifts in variance within our residuals.  Depending on the business question, this may have utility. </font>
+
+### An Example: Circulation and Ad Revenue
+#### __1. The Standard Approach (throw math at it!)__
+
+<font size=3>We will use the AdRevenue database to illustrate this point ….
+
+Imagine we are working for an average sized newspaper looking to increase ad revenue by increasing circulation.  Management wants a simple “this increase in circulation leads to that increase in ad revenue” formula that is not a hard and fast rule but a reliable ballpark.
+
+Here is a summary of the variables we are examining:
+
+
+```{r, include=FALSE, warnings=FALSE, messages=FALSE}
+library(tidyverse)
+```
+```{r}
+
+dfx <- read.csv("D:\\RStudio\\CUNY_621\\AdRevenue.csv", head=TRUE)
+
+dfx <- dfx %>% 
+  dplyr::select(AdRevenue, Circulation) %>%
+  filter(Circulation <= 6)
+
+summary(dfx)
+
+
+```
+
+We run a regression on ad revenue and circulation.  There is a high r-squared (.95), but the residual plot shows some problems. Clearly there is heteroscedasticity here, and so we can’t trust our statistical inferences. A BP test leads us to reject the null hypothesis (that heteroskedasticity is not present).  So what can we do?</font>
+
+```{r, warnings=FALSE, messages=FALSE}
+
+
+
+library(tidyverse)
+dfx1 <- dfx %>%
+  dplyr::select(AdRevenue, Circulation)
+
+p <- lm( AdRevenue ~ Circulation, dfx1)
+plot(p, which = c(1))
+
+bptest(p)
+```
+
+<font size=3>One option is to choose some transformation on the dependent variable and hope it does the trick. Commonly this is the log, so we take the log of ad revenue, run the regression again, and this is what our residual plot looks like now:</font>
+
+```{r, warnings=FALSE, messages=FALSE}
+
+library(MASS)
+
+q <- lm(log(AdRevenue) ~ Circulation, dfx)
+
+plot(q, which = c(1))
+
+bptest(q)
+```
+
+<font size=3> While there are similarities to the previous plot, the tight bunching at lower levels of fitted values is gone.  There are a few odd points at the lower left of the plot, and one or two outliers that give the appearance of heteroskedasticity, but in reality this distribution is a lot more random. Indeed, a Breusch-Pagan test does not allow us to reject the null hypothesis (that heteroscedasticity is not present). So with one simple move, we’ve solved our problem. And while management may not understand our "log" formula, at least we can tell them we have a reliable model.  
+
+But this doesn’t really address the patterning in the variance, it only problematizes it and buries it. It isn’t as if there isn’t still some underlying pattern of variance within the data.</font>
+\
+\
+
+#### 2. A Data-Driven Approach
+
+<font size = 3>It is always my personal preference to start with the data.  So let’s look at a scatterplot of ad revenue and circulation:
+
+
+```{r, warnings=FALSE, messages=FALSE}
+library(EHData)
+library(tidyverse)
+library(gridExtra)
+
+a <-EHSummarize_StandardPlots(dfx, "AdRevenue", return_list = TRUE, h_nbins=50, print = FALSE)
+print(a[[6]])
+
+```
+
+While heteroscedasticity is specifically a patterning of variance within the residuals, we can nonetheless see where some of the issues with variance originate in this data. The scatterplot shows that the relationship between revenue and circulation becomes increasingly less tightly coupled as circulation becomes larger.  It should be noted that __this pattern of variance is extremely common__, and so it would benefit us to know when and why it happens.  If this is a feature of our data and we discover that has meaning and /or consequences, we would want to communicate this with management.  There are many reasons why it may occur - here are just four: 
+
+*	__*a percentage or other size effect:*__ as newspapers get larger, mathematically a 10% variation in ad revenue is going to be much larger for the bigger papers than for the smaller ones.  Thus, we often see this cone-shaped patterning of heteroskedasticity when there is a very large range of low to high values.
+
+*	__*a missing variable:*__  newspapers may have more options as they get larger. For example, maybe smaller newspapers tend to be free of charge, while the larger ones can rely more on subscription fees, and therefore some have less incentive to pursue ad revenues aggressively.  Heteroskedasticity is a common sign of a missing variable.
+
+*	__*an interaction effect:*__  the relationship between circulation and ad revenue may be different for small newspapers compared to large. For example, the market for large advertisers may be much more competetive, but also much more lucrative, than for smaller advertisers. When there a fundamental changes in the variance of the conditions of the relationship when you go from small to large values, you will see heteroskedasticity.  Sometimes the cone faces the other way than in this newspaper example - e.g., the relationship between flight departure delays and arrival delays shows much more variance for small departure delays than for large. 
+
+* __*a hidden grouping effect:*__ large papers in small markets may exhaust advertising opportunities quickly, while large newspapers in large markets may have increased advertising opportunities.
+
+The fact that a log transformation eliminated the heteroscedasticity may suggest that a percentage effect is in play, but we don’t know that.  Without more information we don't know whether our model is incomplete.  And it cannot be overstated that __*if the issue is a mispecification of the model, it is  contraindicated to use a transformation to hide the impact of the missing variable.*__  In any case, the pattern of the variance tells us that the relationship between circulation and ad revenue is less tight as newspapers get larger, and management should be aware of this.  Further, we can see from the scatterplot that no matter what the true standard error is, it is extremely unlikely that for a medium sized company it includes a slope of zero. We can’t say precisely how much ad revenue will increase with increase in circulation, but we can, in fact, be confident that it will increase even without a reliable standard error.
+
+So we could report to management:
+
+*“Here is a handy formula with a bit of advanced math - we can give you a hand if you need to decipher it”,* 
+
+or we could report:
+
+*“We’ve given you a ballpark estimate, give or take, of the relationship between circulation and ad revenue.  We’re confident ad revenue will increase with circulation, but if you need more precision around the “give or take” part, we can provide that with a more complex formula.  However, there’s something else you should be aware of.  As we increase in size, the risk- reward of generating ad revenue through circulation is going to increase.  We don’t know if this is simply inherent in the relationship, or if larger companies begin to replace ad revenue with subscription revenue or some other means. This is something we’d like to study and request budgeting to do so.   In any case, this phenomenon should be incorporated into any company risk management strategy.”*
+
+I know I would prefer the second.
+
+Final note - a debate in data science, perhaps not as major as the one between Frequentists and Baysians, is how to spell heteroscedasticity. Because the “hetero” suffix is Greek, technically speaking the Greek spelling (with a k) is more correct. However, it does make the writer look like they  don’t know how to spell and just went at it phonetically. So again, it depends on use case and personal preference. I like heteroscedasticity because, quite frankly, I like the way it looks.
+

@@ -20,121 +20,45 @@ library(gridExtra)
 library(MASS)
 ```
 
-### Eliminating a column from the database
+### Distinguishing between MARS and MCARS
 
-When is it safe to eliminate a column from the database because of the presence of NA's?
+We have more options when our missing data is completely random than when it's just plain random.  How can we tell the difference?  Here are a few ways I can think of to test the non-complete randomness of missings - but I would like to know What are the best practices?  
 
 I will be using the kangaroo skull dataset from LMR (kanga) to investigate these questions, focusing particularly on palate.width because it has the most missing values. 
-```{r}
 
-#install.packages("NHANES")
-library(NHANES)
-
-```
-
+Here we see the columns in the dataset and their missing values. In all, 31% of the records have missing values so we are unlikely to discard all recoprds with missing, but it is still useful to know how non-random the randomness is.
 
 
 ```{r}
 
-dfV <- read.csv("C:\\users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\kanga_files\\Vehicles.txt", header = TRUE)
-#Uses the NANIAR package
 data(kanga, package="faraway")
-
-#install.packages("NHANES")
-library(NHANES)
 library(dplyr)
 
-#make a selection
-dfH <- NHANES %>% dplyr::select(Age,AgeDecade,Education,Poverty,Work,LittleInterest,Depressed,BMI,Pulse,BPSysAve,BPDiaAve,DaysPhysHlthBad,PhysActiveDays)
-
-
-
-summary(dfH)
-qqq <- EHData::EHSummarize_MissingValues(dfH)
+qqq <- EHData::EHSummarize_MissingValues(kanga)
 print(qqq[[1]])
 
 ```
 
-First we run OLS on the dataset with and without the column at issue.  The column is not significant and adjusted R-squared __*improves*__ when we remove it so it seems like a no-brainer.
+Here are some methods I've considered:
+
+1. Run a regression with the data mean-imputed and and compare with a regression with the na's omitted.  There should be some difference because the variance in the imputed database is lower - but is the difference significant?  In our example, the difference between the r-squared for mean imputed, median imputed and na omitted is relatively small:
 
 ```{r}
 
-summary(lm(ramus.height ~ ., kanga))
-
-kanga1 <- kanga %>%
-  dplyr::select(-"palate.width")
-
-summary(lm(ramus.height ~ ., kanga1))
-
-kanga1 <- kanga %>%
-  dplyr::select(-"occipital.depth")
-
-summary(lm(ramus.height ~ ., kanga1))
-
-```
-The problem is, if the missing values are MAR, not MCAR, then we may lose valuable information. For example,  
-
-1. Create a flag for missing values and look for interactions.  If there are significant interactions we might discard the column but retain the flag - however, here we see only minor interactions.
-
-```{r}
-E_Interactions_Scatterplots <- function(df, y, interaction) {
-  
-  library(ggsci)
-  
-  df <- select_if(df, is.numeric)
-  
-  df[,interaction] <- as.factor(df[,interaction])
-  
-  plot_list <- list()
-  
-  for(i in 1:ncol(df)) { 
-    
-    print(colnames(df)[i])
-    
-    p <- eval(substitute(ggplot(df, aes_string(df[,i], y, color=interaction)) +
-                           geom_point(alpha=.1) +
-                           geom_smooth(method = "lm") +
-                           xlab("") +
-                           theme(title = element_text(size=7), axis.title.x = element_text(size = 7), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), panel.grid.major.x = element_line(color="gray"), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
-                           scale_color_d3()+
-                           scale_fill_d3()+
-                           ggtitle(colnames(df)[i]), list(i=i)))
-    plot_list[[i]] <- p 
-    
-  }
-  return(plot_list)
-}
+dfImputed <- EHPrepare_MissingValues_Imputation(kanga, "ramus.height")
 
 ```
 
+2. Create flags for missing values and look for interactions.  If there are significant interactions we might discard the column but retain the flag.  Here we test for interactions with one variable and find only very minor interactions:
 
 ```{r}
 
-#kanga2 <- kanga %>%
-#  dplyr::mutate(OD_flag = ifelse(is.na(mandible.length), 1, 0))
+kanga2 <- kanga %>%
+  dplyr::mutate(PW_Missing = ifelse(is.na(palate.width), 1, 0))
                 
-#q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "OD_flag")
-#grid.arrange(grobs=q[c(1:16)], ncol=4)
-#q[[1]]
+q <- EHData::EHExplore_Interactions_Scatterplots(kanga2, "ramus.height", "PW_Missing")
+grid.arrange(grobs=q[c(1:16)], ncol=4)
 
-dfH2 <- as.data.frame(dfH) %>%
-  dplyr::mutate(D_flag = ifelse(is.na(Depressed), 1, 0))
-
-xx <- na.omit(dfH2)
-
-
-q4 <- E_Interactions_Scatterplots(dfH2, "BMI", "D_flag")
-library(patchwork)
-
-wrap_plots(q4)
-
-```
-
-2. Impute missing values and look for significant differences in R-squared (there will likely be some minor difference because single imputation has an affect on variance).  Here we see little difference.
-
-```{r}
-
-qq <- EHData::EHPrepare_MissingValues_Imputation(df=kanga2, y="ramus.height")
 ```
 
 3. Look for overlap among missing values. Here we see little overlap.
@@ -147,13 +71,5 @@ print(qqq[[2]])
 kanga3 <- na.omit(kanga2)
 
 ```
-4. Look at correlations between the column with missing values and other variables. Here we see significant multicollinearity:
 
-```{r}
-q <- EHData::EHExplore_TwoContinuousColumns_Scatterplots(kanga, y="occipital.depth")
-grid.arrange(grobs=q[c(1:16)], ncol=4)
-```
-
-```
-
-Records with missing values make up 32% of the database.  What is the best strategy here? 
+I would onclude from this anlaysis that the missing values are likely to be MCARS.  However, I'd like to know how experts approach it.

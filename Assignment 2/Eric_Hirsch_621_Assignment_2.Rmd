@@ -1,0 +1,253 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "3/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(caret)
+library(pROC)
+library(tidyverse)
+```
+
+
+Read the data
+
+```{r}
+
+dfB <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 2\\classification-output-data.csv")
+dfB <- dfB %>%
+  select(class, scored.class, scored.probability)
+
+```
+
+
+Review the raw confusion matrix - 
+
+```{r}
+
+dfB1 <- dfB %>%
+  select(-scored.probability)
+
+table(dfB1)
+
+dfTable <- as.data.frame(table(dfB1))
+
+```
+
+The raw confusion matrix shows us the actual values as rows and the scored values as columns. The upper left-lower right diagonal contains correct predictions, while the opposite diagonal contains incorrect predictions.
+
+We write a function to return accuracy (correct predictions over all predictions)
+
+```{r}
+
+TableToDf <- function (df)
+{
+  df1 = as.data.frame(table(df))
+  li <- vector(mode = "list", length = 4)
+  names(li) <- c("TP", "TN", "FP", "FN")
+  
+  li$TP <- df1$Freq[4]
+  li$TN <- df1$Freq[1]
+  li$FP <- df1$Freq[3]
+  li$FN <- df1$Freq[2]
+  
+  #if(is.na(li$TP)) {
+  #  li$TP=1
+  #}
+  #  if(is.na(li$TN)) {
+  #  li$TN=1
+  #  }
+  #  if(is.na(li$FP)) {
+  #  li$FP=1
+  #  }
+  #  if(is.na(li$FN)) {
+  #  li$FN=1
+  #  }
+  
+  
+  return(li)
+
+}
+```
+```{r}
+
+```
+
+
+```{r}
+
+Accuracy <- function(df) {
+  
+li <- TableToDf(df)
+Accuracy <- (li$TP + li$TN)/(li$TP + li$TN + li$FP + li$FN)
+
+return (Accuracy)
+
+}
+
+print(Accuracy(dfB1))
+```
+
+Classification Error Rate (incorrect predictions over all predicitons:
+```{r}
+
+ClassificationErrorRate <- function(df) {
+
+li <- TableToDf(df)
+Error <- (li$FP + li$FN)/(li$TP + li$TN + li$FP + li$FN)
+
+return (Error)
+  
+  
+}
+print(ClassificationErrorRate(dfB1))
+```
+
+Accuracy + error rate = 1
+
+```{r}
+
+print(as.numeric(ClassificationErrorRate(dfB1)) + as.numeric(Accuracy(dfB1)))
+
+```
+
+Precision (True positives/All who tested positive):
+
+```{r}
+
+Precision <- function(df) {
+  
+li <- TableToDf(df)
+Precision <- (li$TP)/(li$TP + li$FP)
+
+return(Precision)
+  
+}
+print(Precision(dfB1))
+```
+Sensitivity/Recall (True positives/All who are positive):
+
+```{r}
+
+Sensitivity <- function(df) {
+  
+li <- TableToDf(df)
+
+  
+  Sensitivity <- (li$TP)/(li$TP + li$FN)
+
+  
+
+return(Sensitivity)
+  
+}
+print(Sensitivity(dfB1))
+
+```
+
+Specificity (True negatives/All who are negative):
+```{r}
+
+Specificity <- function(df) {
+  
+li <- TableToDf(df)
+Specificity <- (li$TN)/(li$TN + li$FP)
+
+return(Specificity)
+  
+}
+print(Specificity(dfB1))
+
+```
+F1 score:
+```{r}
+
+F1 <- function(df) {
+
+
+p <- Precision(dfB1)
+s <- Sensitivity(dfB1)
+
+F1 <- (2*p*s)/(p+s)
+
+return(F1)
+  
+}
+
+print(F1(dfB1))
+
+```
+
+Precision (P) and Sensitivity (S) themselves are always <= 1 because their denominators are a simple sum which include the numerators.  Therefore, P$*$S < P and P$*$S < S. Therefore, 2PS < P + S.
+
+Construct an ROC curve
+
+```{r}
+
+ROC <- function(df) {
+  
+dfNew <- data.frame(class = numeric(),
+ scored.class = numeric())
+
+dfFinal <- data.frame(Specificity = numeric(),
+ Sensitivity = numeric(), Area = numeric(), Width=numeric())
+
+spec_prev = 0
+sens_prev = 0
+  
+for (i in 1:100) {
+  for (j in 1:length(df$class))
+  {
+    
+  dfNew[j, 1] = df$class[j]
+  dfNew[j, 2]  <- ifelse(df$scored.probability[j] > i/100, 1, 0)
+  }
+  
+  sens <- Sensitivity(dfNew)
+  spec <- 1 - Specificity(dfNew)
+  
+  width = spec_prev - spec
+  ave_sens = (sens + sens_prev)/sens
+  
+  dfFinal[i,1] <- spec
+  dfFinal[i,2] <- sens
+  dfFinal[i,3] <- sens*width
+  dfFinal[i,4] <- width
+  
+  spec_prev = spec
+  sens_prev = sens
+}
+
+dfFinal <- na.omit(dfFinal)
+
+AUC <- sum(dfFinal$Area)/sum(dfFinal$Width)
+print (AUC)
+
+print(ggplot(dfFinal, aes(x=Specificity, y=Sensitivity)) +
+             geom_line())
+
+return (dfFinal)
+}
+
+x1 <- ROC(dfB)
+```
+
+```{r}
+roc(class ~ scored.probability, dfB)
+
+roc1 <- roc(dfB$class,
+            dfB$scored.probability, plot=TRUE)
+```
+
+```{r}
+
+print(aucROC(dfB$class, dfB$scored.probability))
+
+```
+
