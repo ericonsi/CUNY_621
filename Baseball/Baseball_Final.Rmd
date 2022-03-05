@@ -2,7 +2,7 @@
 title: "Moneyball - CUNY Data Science 621"
 author: "Eric Hirsch"
 date: "2/20/2021"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE, warning=FALSE, message=FALSE}
