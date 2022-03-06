@@ -37,7 +37,7 @@ So when heteroskedasticity is present, we are inhibited about making claims abou
 
 <font size=3>We will use the AdRevenue database from Simon Sheather (__A Modern Approach to Regression.__ *Simon Sheather*, Springer Texts in Statistics: 2009) to illustrate this point.  I've removed some outliers to make the point more clear.
 
-Imagine we are working for a relatively small-sized newspaper looking to increase ad revenue by increasing circulation.  Management wants a simple “this increase in circulation leads to that increase in ad revenue” formula, one that is not a hard and fast rule but a reliable ballpark.
+Imagine we are working for a relatively small-sized newspaper looking to increase ad revenue by increasing circulation.  Management wants a simple “this increase in circulation leads to that increase in ad revenue” formula, not a hard and fast rule but a reliable ballpark.
 
 Here is a summary of the variables we are examining:
 
@@ -92,14 +92,14 @@ But this alone doesn’t really address the patterning in the variance. Unless w
 
 ```{r, warnings=FALSE, messages=FALSE}
 library(EHData)
-ggplot(dfx,  aes(AdRevenue, Circulation)) +
+ggplot(dfx,  aes(Circulation, AdRevenue)) +
       geom_point(fill="navy", color="navy") +
       geom_smooth(method = "lm", color="red", fill="lightcoral") + EHData::EHTheme()
 ```
 
 While heteroskedasticity is specifically a patterning of variance within the *residuals*, we can nonetheless see where some of that variance originates. The scatterplot shows that the relationship between revenue and circulation becomes increasingly less tightly coupled as circulation becomes larger.  It should be noted that __this pattern of variance is extremely common__, and so it would benefit us to know when and why it happens.  If this is a feature of our data and we discover that it  has meaning and/or consequences, we would want to communicate this with management.  There are many reasons why it may occur - here are just four: 
 
-*	__*a percentage or other size effect:*__ as newspapers get larger, mathematically a 10% variation in ad revenue is going to be much larger for the bigger papers than for the smaller ones.  Thus, we often see this cone-shaped patterning of heteroskedasticity when there is a very large range of low to high values, and particluarly when a percentage increase in the independent variable leads to a percentage increase in the independent variable.
+*	__*a percentage or other size effect:*__ as newspapers get larger, mathematically a 10% variation in ad revenue is going to be much larger for the bigger papers than for the smaller ones.  Thus, we often see this cone-shaped patterning of heteroskedasticity when there is a very large range of low to high values, and particluarly when a percentage increase in the independent variable leads to a percentage increase in the idependent variable.
 
 *	__*a missing variable:*__  newspapers may have more revenue options as they get larger. For example, maybe smaller newspapers tend to be free of charge, while the larger ones can rely more on subscription fees, and therefore some have less incentive to pursue ad revenues aggressively.  Heteroskedasticity is a common sign of a missing variable.
 
@@ -107,7 +107,7 @@ While heteroskedasticity is specifically a patterning of variance within the *re
 
 * __*a hidden grouping effect:*__ large papers in small markets may exhaust advertising opportunities quickly, while large newspapers in large markets may have increased advertising opportunities.
 
-The fact that a log transformation eliminated the heteroskedasticity may suggest that a percentage effect is in play, but we would want to investigate that further before we reached that conclusion.  Without more information we don't know whether our model is incomplete or not.  __*And if the issue is a mispecification of the model, it is  contraindicated to use a transformation to hide the impact of the missing effects.*__  In any case, the pattern of the variance tells us that the relationship between circulation and ad revenue is less tight as newspapers get larger, and management should be aware of this.  Further, we can see from the scatterplot that no matter what the true standard error is, it is unlikely to negate the effect completely. We can’t say precisely how much ad revenue will increase with increase in circulation, but we can, in fact, be confident that it will increase, even without a reliable standard error.
+The fact that a log transformation eliminated the heteroskedasticity may suggest that a percentage effect is in play, but we would want to investigate that further before we reached that conclusion.  Without more information, we don't know whether our model is incomplete or not.  __*And if the issue is a mispecification of the model, it is  contraindicated to use a transformation to hide the impact of the missing effects.*__  In any case, the pattern of the variance tells us that the relationship between circulation and ad revenue is less tight as newspapers get larger, and management should be aware of this as it suggests that relying on ad revenue may be increasingly more rewarding, but also more risky.  Further, we can see from the scatterplot that no matter what the true standard error is, it is unlikely to negate the effect completely. We can’t say precisely how much ad revenue will increase with increase in circulation, but we can, in fact, be confident that it will increase, even without a reliable standard error.
 
 So we could report to management:
 
@@ -121,4 +121,4 @@ I know I would prefer the second.
 
 In sum, heteroskedasticity violates a fundamental assumption about variance for our regression and therefore invalidates inferences based on standard errors and p-values.  But the fact is, variance may also tell an important story. Sometimes heteroskedasticity invalidates our entire model, but perhaps sometimes it is our model.  After all, a model is just a simplified description of what is significant about our data, it isn't the regression itself.
 
-A final note - a debate in data science, up there with the Frequentists vs. Baysians, is how to spell heteroskedasticity (or is it heteroscedasticity?). Because the “hetero” suffix is Greek, technically speaking the Greek spelling (with a k) is more correct. However, it does make the writer appear as if they don’t know how to spell and just went at it phonetically. So as always, it depends on use case and personal preference. I like heteroskedasticity because I like the way it looks.
+A final note - a debate in data science, up there with the Frequentists vs. Baysians, is how to spell heteroskedasticity (or is it heteroscedasticity?). Because the “hetero” suffix is Greek, technically speaking the Greek spelling (with a k) is more correct. However, it does give the appearance that the writer doesn't know how to spell and just went at it phonetically. So as always, it depends on use case and personal preference. I like heteroskedasticity because I like the way it looks.
