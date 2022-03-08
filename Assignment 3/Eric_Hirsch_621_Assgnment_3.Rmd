@@ -1,0 +1,35 @@
+---
+title: "Untitled"
+author: "Eric Hirsch"
+date: "3/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+#devtools::install_github("ericonsi/EHData")
+library(EHData)
+library(patchwork)
+library(gridExtra)
+```
+```{r}
+
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+```
+
+```{r}
+
+summary(df)
+
+```
+```{r}
+wrap_plots(EHSummarize_SingleColumn_Boxplots(df))
+wrap_plots(EHSummarize_SingleColumn_Histograms(df))
+EHSummarize_StandardPlots(df, "target")
+
+```
+ 
