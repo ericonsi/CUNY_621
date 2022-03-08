@@ -520,7 +520,8 @@ We examine the new model's output:
 
 ```{r}
 
-step3 <- EHModel_Regression_StandardLM(dfTrain5, "TARGET_WINS")
+step3 <- EHModel_Regression_StandardLM(dfTrain5, "TARGET_WINS"
+                                       )
 
 ```
 
