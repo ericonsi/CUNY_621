@@ -1,8 +1,8 @@
 ---
-title: "Untitled"
+title: "Eric_Hirsch_621_Assignmrnt_2"
 author: "Eric Hirsch"
 date: "3/2/2022"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -26,8 +26,9 @@ dfB <- dfB %>%
 
 ```
 
+## Homework 2
 
-Review the raw confusion matrix - 
+### 1. Review the raw confusion matrix - 
 
 ```{r}
 
@@ -74,11 +75,11 @@ TableToDf <- function (df)
   return(li)
 
 }
-```
-```{r}
 
+x <- TableToDf(dfB1)
 ```
 
+### 2. Accuracy Function
 
 ```{r}
 
@@ -93,6 +94,8 @@ return (Accuracy)
 
 print(Accuracy(dfB1))
 ```
+
+### 3. Classification Error Rate Function
 
 Classification Error Rate (incorrect predictions over all predicitons:
 ```{r}
@@ -117,7 +120,7 @@ print(as.numeric(ClassificationErrorRate(dfB1)) + as.numeric(Accuracy(dfB1)))
 
 ```
 
-Precision (True positives/All who tested positive):
+### 4. Precision Function (True positives/All who tested positive):
 
 ```{r}
 
@@ -131,7 +134,7 @@ return(Precision)
 }
 print(Precision(dfB1))
 ```
-Sensitivity/Recall (True positives/All who are positive):
+### 5. Sensitivity/Recall Function (True positives/All who are positive):
 
 ```{r}
 
@@ -151,7 +154,7 @@ print(Sensitivity(dfB1))
 
 ```
 
-Specificity (True negatives/All who are negative):
+### 6. Specificity Function (True negatives/All who are negative):
 ```{r}
 
 Specificity <- function(df) {
@@ -165,7 +168,7 @@ return(Specificity)
 print(Specificity(dfB1))
 
 ```
-F1 score:
+### 7. F1 score Function:
 ```{r}
 
 F1 <- function(df) {
@@ -184,13 +187,17 @@ print(F1(dfB1))
 
 ```
 
+### 8. Bounds on the F1 score
+
 Precision (P) and Sensitivity (S) themselves are always <= 1 because their denominators are a simple sum which include the numerators.  Therefore, P$*$S < P and P$*$S < S. Therefore, 2PS < P + S.
 
-Construct an ROC curve
+### 9. ROC curve Function
 
 ```{r}
 
 ROC <- function(df) {
+  
+list1 <- list()
   
 dfNew <- data.frame(class = numeric(),
  scored.class = numeric())
@@ -227,27 +234,51 @@ for (i in 1:100) {
 dfFinal <- na.omit(dfFinal)
 
 AUC <- sum(dfFinal$Area)/sum(dfFinal$Width)
-print (AUC)
+print (paste("AUC:", AUC))
 
-print(ggplot(dfFinal, aes(x=Specificity, y=Sensitivity)) +
-             geom_line())
+g <- ggplot(dfFinal, aes(x=Specificity, y=Sensitivity)) +
+             geom_line()
 
-return (dfFinal)
+x <- list(g, dfFinal$Area)
+
+return (x)
 }
 
-x1 <- ROC(dfB)
 ```
+
+
+### 10. Provide all metrics
+
+```{r, warning=FALSE, message=FALSE}
+
+print(paste("Accuracy: ", Accuracy(dfB1)))
+print(paste("Classification Error: ", ClassificationErrorRate(dfB1)))
+print(paste("Precision: ", Precision(dfB1)))
+print(paste("Sensitivity: ", Sensitivity(dfB1)))
+print(paste("Specificity:", Specificity(dfB1)))
+print(paste("F1:", F1(dfB1)))
+
+x1 <- ROC(dfB)
+print(x1[[1]])
+
+```
+
+### 11. The caret package provides statistics that match ours.
+
+```{r}
+
+dfB1$class <- as.factor(dfB1$class)
+dfB1$scored.class <- as.factor(dfB1$scored.class)
+
+confusionMatrix(data = dfB1$scored.class, reference = dfB1$class)
+
+```
+### 12. The pROC can be used to create an ROC curve.  This curve matches our own.
 
 ```{r}
 roc(class ~ scored.probability, dfB)
 
 roc1 <- roc(dfB$class,
             dfB$scored.probability, plot=TRUE)
-```
-
-```{r}
-
-print(aucROC(dfB$class, dfB$scored.probability))
-
 ```
 

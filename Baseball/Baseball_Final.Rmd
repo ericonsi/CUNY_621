@@ -38,7 +38,7 @@ library(ggsci)
 ```
 
 ```{r}
-devtools::install_github("ericonsi/EHData", force=TRUE)
+#devtools::install_github("ericonsi/EHData", force=TRUE)
 
 ```
 
@@ -105,6 +105,7 @@ grid.arrange(grobs=a[c(1:16)], ncol=4, top = "Column Distributions", bottom="Fig
 
 
 ```
+
 Our dependent variable (Target Wins) appears to be normally distributed.  However, a number of columns are severely skewed (Errors, Strikeouts, Pitching_H, etc.) A few columns (Batting SO, Pitching_HR and Batting_HR) have a bimodal distribution.  This might point to some hidden groupings in the dataset.
 
 Boxplots help us identify outliers (fig. 2):
@@ -190,7 +191,7 @@ grid.arrange(a[[6]], a[[10]], a[[11]], a[[12]], a[[14]], ncol=2, top = "Selected
 
 ```
 
-It is possible this cohort represents a different baseball era when such statistics were not collected.  In any case, we cannot eliminate these rows without losing critical data, so we employ the following strategy: 1) create the rows and impute a value, 2) retain a "missing" flag to keep track of the cohort, and 2) add interaction terms where appropriate.
+It is possible this cohort represents a different baseball era when such statistics were not collected.  In any case, we cannot eliminate these rows without losing critical data, so we employ the following strategy: 1) retain the rows and impute a value, 2) create a "missing" flag to keep track of the cohort, and 2) add interaction terms where appropriate.
 
 Before we address imputation, we want to work with the implausible zeros in the dataet.  In particular, we note that the 0s in Pitching_SO and Batting_SO are a complete overlap, and we can see from the histograms that the jump between 0 and the next lowest value is not smooth, and so we will treat them as NA's.  We do the same with batting and pitching HR, since there is also a jump up after zero which suggests it is being used as an indicator of missing value. 
 

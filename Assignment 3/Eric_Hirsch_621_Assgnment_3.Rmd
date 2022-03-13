@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -24,12 +24,17 @@ df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modifie
 ```{r}
 
 summary(df)
+str(df)
 
 ```
 ```{r}
 wrap_plots(EHSummarize_SingleColumn_Boxplots(df))
 wrap_plots(EHSummarize_SingleColumn_Histograms(df))
 EHSummarize_StandardPlots(df, "target")
+```
+```{r}
+
+EHSummarize_StandardPlots(df, "target", type="box")
 
 ```
  
