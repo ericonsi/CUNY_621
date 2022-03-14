@@ -15,7 +15,6 @@ library(pROC)
 library(tidyverse)
 ```
 
-
 Read the data
 
 ```{r}

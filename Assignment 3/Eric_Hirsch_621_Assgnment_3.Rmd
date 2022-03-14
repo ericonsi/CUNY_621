@@ -11,10 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
+library(ggsci)
 ```
 ```{r}
 
@@ -28,13 +29,58 @@ str(df)
 
 ```
 ```{r}
-wrap_plots(EHSummarize_SingleColumn_Boxplots(df))
-wrap_plots(EHSummarize_SingleColumn_Histograms(df))
-EHSummarize_StandardPlots(df, "target")
+library(psych)
+
+EHSummarize_StandardPlots(df, "target", type="box")
+EHExplore_Multicollinearity(df, run_all=TRUE)
+
+```
+
+```{r}
+
+dfM <- df %>%
+  mutate(znM = zn*-1, rmM = rm*-1 )
+```
+
+ 
+```{r}
+
+EHModel_Regression_Logistic(df, "target")
+
+df2 <- df %>%
+  mutate_at(c(1:12), scale)
+
+EHModel_Regression_Logistic(df2, "target")
+
+```
+
+```{r}
+
+df1 <- df %>%
+  select(nox, dis, rad, ptratio, medv, target)
+
+EHModel_Regression_Logistic(df1, "target")
+
+
 ```
 ```{r}
 
-EHSummarize_StandardPlots(df, "target", type="box")
+dfT <- df %>%
+  mutate(TaxOver600 = ifelse(tax>=600,1,0))
+
+EHExplore_Interactions_Scatterplots(dfT, "target", "TaxOver600")
 
 ```
- 
+```{r}
+
+df4 <- dfT %>%
+  select(nox, dis, rad, ptratio, medv, TaxOver600, lstat, target) %>%
+  mutate(lstatOver12 = ifelse(lstat>12,1,0))
+
+EHExplore_TwoCategoricalColumns_Barcharts(dfT, "TaxOver600")
+EHExplore_Interactions_Scatterplots(df4, "target", "lstatOver12")
+
+EHModel_Regression_Logistic(df4, "target")
+
+```
+
