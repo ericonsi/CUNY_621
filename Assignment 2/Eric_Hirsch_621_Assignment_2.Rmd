@@ -21,7 +21,7 @@ Read the data
 
 dfB <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 2\\classification-output-data.csv")
 dfB <- dfB %>%
-  select(class, scored.class, scored.probability)
+  dplyr::select(class, scored.class, scored.probability)
 
 ```
 
@@ -32,7 +32,7 @@ dfB <- dfB %>%
 ```{r}
 
 dfB1 <- dfB %>%
-  select(-scored.probability)
+  dplyr::select(-scored.probability)
 
 table(dfB1)
 
