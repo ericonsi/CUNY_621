@@ -46,6 +46,8 @@ dfM <- df %>%
 ```{r}
 
 EHModel_Regression_Logistic(df, "target")
+```
+```{r}
 
 df2 <- df %>%
   mutate_at(c(1:12), scale)
@@ -71,15 +73,45 @@ dfT <- df %>%
 EHExplore_Interactions_Scatterplots(dfT, "target", "TaxOver600")
 
 ```
+
+```{r}
+
+dfT2 <- df %>%
+  mutate(IndusOver16 = ifelse(indus>=16,1,0))
+
+EHExplore_Interactions_Scatterplots(dfT2, "target", "IndusOver16")
+
+```
+
 ```{r}
 
 df4 <- dfT %>%
-  dplyr::select(nox, dis, rad, ptratio, medv, TaxOver600, lstat, target) %>%
-  mutate(lstatOver12 = ifelse(lstat>12,1,0))
+  mutate(lstatOver12 = ifelse(lstat>12,1,0), Inter_taxOver600_lstat = TaxOver600*lstat, Inter_lstatOver12_medv = lstatOver12*medv, IndusOver16 = ifelse(indus>=16,1,0)) 
 
 EHExplore_TwoCategoricalColumns_Barcharts(dfT, "TaxOver600")
 EHExplore_Interactions_Scatterplots(df4, "target", "lstatOver12")
+```
 
-EHModel_Regression_Logistic(df4, "target")
+```{r}
+
+
+plot(EHModel_Regression_Logistic(df4, "target")) 
 
 ```
+
+```{r}
+
+
+df5 <- df4 %>%
+  dplyr::filter(rownames(df4) != "338")
+
+df6 <- df5 %>%
+  dplyr::select(-IndusOver16) %>%
+  mutate(zn=log(zn+1))
+
+
+plot(EHModel_Regression_Logistic(df5, "target"))
+
+
+```
+

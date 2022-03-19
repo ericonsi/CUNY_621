@@ -1,15 +1,24 @@
 ---
 title: "Eric_Hirsch_621_Assignmrnt_2"
 author: "Eric Hirsch"
-date: "3/2/2022"
-output: pdf_document
+date: "3/20/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 ```{r}
+#tinytex::install_tinytex()
+
+```
+
+
+```{r, warnings = FALSE, messages=FALSE}
 library(caret)
 library(pROC)
 library(tidyverse)
@@ -25,9 +34,7 @@ dfB <- dfB %>%
 
 ```
 
-## Homework 2
-
-### 1. Review the raw confusion matrix - 
+## A. Review the raw confusion matrix - 
 
 ```{r}
 
@@ -41,6 +48,8 @@ dfTable <- as.data.frame(table(dfB1))
 ```
 
 The raw confusion matrix shows us the actual values as rows and the scored values as columns. The upper left-lower right diagonal contains correct predictions, while the opposite diagonal contains incorrect predictions.
+
+## B. Calculate Prediciton Metrics
 
 We write a function to return accuracy (correct predictions over all predictions)
 
@@ -57,20 +66,6 @@ TableToDf <- function (df)
   li$FP <- df1$Freq[3]
   li$FN <- df1$Freq[2]
   
-  #if(is.na(li$TP)) {
-  #  li$TP=1
-  #}
-  #  if(is.na(li$TN)) {
-  #  li$TN=1
-  #  }
-  #  if(is.na(li$FP)) {
-  #  li$FP=1
-  #  }
-  #  if(is.na(li$FN)) {
-  #  li$FN=1
-  #  }
-  
-  
   return(li)
 
 }
@@ -78,7 +73,7 @@ TableToDf <- function (df)
 x <- TableToDf(dfB1)
 ```
 
-### 2. Accuracy Function
+### 1. Accuracy Function
 
 ```{r}
 
@@ -94,7 +89,7 @@ return (Accuracy)
 print(Accuracy(dfB1))
 ```
 
-### 3. Classification Error Rate Function
+### 2. Classification Error Rate Function
 
 Classification Error Rate (incorrect predictions over all predicitons:
 ```{r}
@@ -119,7 +114,7 @@ print(as.numeric(ClassificationErrorRate(dfB1)) + as.numeric(Accuracy(dfB1)))
 
 ```
 
-### 4. Precision Function (True positives/All who tested positive):
+### 3. Precision Function (True positives/All who tested positive):
 
 ```{r}
 
@@ -133,7 +128,7 @@ return(Precision)
 }
 print(Precision(dfB1))
 ```
-### 5. Sensitivity/Recall Function (True positives/All who are positive):
+### 4. Sensitivity/Recall Function (True positives/All who are positive):
 
 ```{r}
 
@@ -153,7 +148,7 @@ print(Sensitivity(dfB1))
 
 ```
 
-### 6. Specificity Function (True negatives/All who are negative):
+### 5. Specificity Function (True negatives/All who are negative):
 ```{r}
 
 Specificity <- function(df) {
@@ -167,7 +162,7 @@ return(Specificity)
 print(Specificity(dfB1))
 
 ```
-### 7. F1 score Function:
+### 6. F1 score Function:
 ```{r}
 
 F1 <- function(df) {
@@ -186,11 +181,11 @@ print(F1(dfB1))
 
 ```
 
-### 8. Bounds on the F1 score
+## C. Bounds on the F1 score
 
 Precision (P) and Sensitivity (S) themselves are always <= 1 because their denominators are a simple sum which include the numerators.  Therefore, P$*$S < P and P$*$S < S. Therefore, 2PS < P + S.
 
-### 9. ROC curve Function
+## D. ROC curve Function
 
 ```{r}
 
@@ -246,33 +241,61 @@ return (x)
 ```
 
 
-### 10. Provide all metrics
+## E. Provide all metrics
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
-print(paste("Accuracy: ", Accuracy(dfB1)))
-print(paste("Classification Error: ", ClassificationErrorRate(dfB1)))
-print(paste("Precision: ", Precision(dfB1)))
-print(paste("Sensitivity: ", Sensitivity(dfB1)))
-print(paste("Specificity:", Specificity(dfB1)))
-print(paste("F1:", F1(dfB1)))
+My_Metrics <- list()
+My_Metrics[1] <- Accuracy(dfB1)
+My_Metrics[2] <- ClassificationErrorRate(dfB1)
+My_Metrics[3] <- Precision(dfB1)
+My_Metrics[4] <- Sensitivity(dfB1)
+My_Metrics[5] <- Specificity(dfB1)
+My_Metrics[6] <- F1(dfB1)
+
+print(paste("Accuracy: ", My_Metrics[[1]]))
+print(paste("Classification Error: ", My_Metrics[[2]]))
+print(paste("Precision: ", My_Metrics[[3]]))
+print(paste("Sensitivity: ", My_Metrics[[4]]))
+print(paste("Specificity:", My_Metrics[[5]]))
+print(paste("F1:", My_Metrics[[6]]))
 
 x1 <- ROC(dfB)
 print(x1[[1]])
 
 ```
 
-### 11. The caret package provides statistics that match ours.
+## F. The caret package provides statistics that match ours.
 
 ```{r}
 
 dfB1$class <- as.factor(dfB1$class)
 dfB1$scored.class <- as.factor(dfB1$scored.class)
 
-confusionMatrix(data = dfB1$scored.class, reference = dfB1$class)
+a <- confusionMatrix(data = dfB1$scored.class, reference = dfB1$class, positive="1")
+
+q <- a$byClass["Sensitivity"]
+
+Caret_Metrics <- list()
+Caret_Metrics[1] <- a$overall["Accuracy"]
+Caret_Metrics[2] <- 1 - as.numeric(Caret_Metrics[[1]])
+Caret_Metrics[3] <- a$byClass["Precision"]
+Caret_Metrics[4] <- a$byClass["Sensitivity"]
+Caret_Metrics[5] <- a$byClass["Specificity"]
+Caret_Metrics[6] <- a$byClass["F1"]
+
+Metric <- c("Accuracy", "ClassificationErrorRate", "Precision", "Sensitivity", "Specificity", "F1")
+
+dfX <- as.data.frame(cbind(Metric, My_Metrics, Caret_Metrics))
+knitr::kable(dfX)
+
+print(a)
+
 
 ```
-### 12. The pROC can be used to create an ROC curve.  This curve matches our own.
+## G. The pROC ROC curve
+
+The pROC package can be used to create an ROC curve.  This curve matches our own.  The AUC scores are slightly different (.84 vs .85)
 
 ```{r}
 roc(class ~ scored.probability, dfB)
@@ -280,4 +303,3 @@ roc(class ~ scored.probability, dfB)
 roc1 <- roc(dfB$class,
             dfB$scored.probability, plot=TRUE)
 ```
-

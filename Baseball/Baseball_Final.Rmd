@@ -33,13 +33,12 @@ library(patchwork)
 library(ggthemes)
 library(tinytex)
 library(stats)
-library(EHData)
 library(ggsci)
 ```
 
 ```{r}
-#devtools::install_github("ericonsi/EHData", force=TRUE)
-
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
 ```
 
 

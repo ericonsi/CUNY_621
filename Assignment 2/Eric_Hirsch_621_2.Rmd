@@ -1,0 +1,346 @@
+---
+title: "Homework 2: Data Science 621"
+author: "Eric Hirsch"
+date: "3/20/2021"
+output: pdf_document
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+```{r}
+
+#tinytex::install_tinytex()
+
+```
+
+
+```{r}
+library(Hmisc)
+library(psych)
+library(tidyverse)
+library(skimr)
+library(purrr)
+library(tidyr)
+library(tidyverse)
+library(gridExtra)
+library(lubridate)
+library(fastDummies)
+library(data.table)
+library(mltools)
+library(MASS)
+library(car)
+library(patchwork)
+library(ggthemes)
+library(tinytex)
+library(stats)
+library(ggsci)
+library(EHData)
+```
+
+```{r}
+
+location <- "home"
+
+if (location == "work"){
+dfTrain <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\Rstudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+dfEval <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+} else
+{
+dfTrain <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-training-data.csv", head=TRUE)
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", head=TRUE)
+#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+#dfEval <- read.csv("C:\\Users\\erico\\Documents\\R\\CUNY_621\\Baseball\\moneyball-evaluation-data.csv", header=TRUE)
+}
+
+colnames(dfTrain)<-gsub("TEAM_","",colnames(dfTrain))
+colnames(dfEval)<-gsub("TEAM_","",colnames(dfEval))
+
+```
+
+## Description of the Dataset
+
+##### a. ASSIGNMENT: 
+
+In this assignment we explore, analyze and model a data set containing approximately 2276 records, each representing a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
+
+We will build a multiple linear regression model on the training data to predict the number of wins for the team.
+
+##### b. THE ISSUE OF HIDDEN GROUPINGS:
+
+An issue with the data is hidden groupings.  Records may not be independent of each other, as team data in one year will be related to team data in the next year.  We know that if some records were adjusted to match a longer season, there may be an "eras of baseball" effect as teams from earlier years behave differently from later ones.  Finally, within the record, columns may not be independent.  In particular, teams with high offensive stats (like hitting) may have lower defensive stats (like pitching), as the teams on limited budgets make strategic choices between the two.  We will attempt to address some of these issues in this analysis.
+
+## 1. Data Exploration
+
+All of the columns in the dataset are numeric.  We begin by examining their means, medians and distributions.
+
+```{r}
+
+summary(dfTrain)
+```
+We note that a number of columns have NAs.  Batting_SO and Pitching_SO have the same number of NA's and may be related.
+
+```{r}
+
+#a <- EHSummarize_MissingValues(dfTrain)
+#print(a[[1]])
+
+```
+
+
+We more closely examine the distribution of columns in the dataset (fig. 1):
+
+```{r fig.height=8, fig.width=8}
+
+df_NoIndex <- dfTrain %>%
+  dplyr::select(-INDEX)
+
+a <- EHSummarize_SingleColumn_Histograms(df_NoIndex, font_size = 9)
+grid.arrange(grobs=a[c(1:16)], ncol=4, top = "Column Distributions", bottom="Fig. 1")
+
+
+```
+
+Our dependent variable (Target Wins) appears to be normally distributed.  However, a number of columns are severely skewed (Errors, Strikeouts, Pitching_H, etc.) A few columns (Batting SO, Pitching_HR and Batting_HR) have a bimodal distribution.  This might point to some hidden groupings in the dataset.
+
+Boxplots help us identify outliers (fig. 2):
+
+```{r fig.height=8, fig.width=8}
+
+a <- EHSummarize_SingleColumn_Boxplots(df_NoIndex, font_size=9)
+grid.arrange(grobs=a[c(1:16)], ncol=4, top = "Boxplots for Outlier Analysis", bottom="Fig. 2")
+
+
+```
+
+There a number of outliers, both high and low. For example, there are many zeros, which may be implausible. In addition, many of the ranges appear extreme, such as giving up between 3,500 hits and 19,000 hits, or getting from 12 to over 800 walks.
+
+We investigate correlations in the dataset, both between the dependent variable and the other variables (fig. 3), and between the dependent variables and each other (fig. 4).  
+
+```{r fig.height= 8, fig,width = 8}
+
+a <-  EHExplore_TwoContinuousColumns_Scatterplots(df_NoIndex, "TARGET_WINS")
+grid.arrange(grobs=a[c(2:16)], ncol=3, top = "Scatterplots Against TARGET_WINS", bottom="Fig.3")
+
+
+```
+
+Here we see a number of puzzles, mainly among the pitching correlations.  Hits should show a much stronger negative correlation, and in fact appear positive for a portion.  Making double plays is surprisingly neutral, as are strikeouts. Pitching_HR is also positive when we would expect negative.
+
+We do need to acknowledge here the possibility of strategy groupings (defense and offense) which may contribute to these anomalies.  In other words, a team with poor pitching may have strong hitting, which then wins games.
+
+We can look for evidence of this possibility by examining multicollinearity: 
+
+```{r}
+  EHExplore_Multicollinearity(dfTrain, title="Correlations, Fig. 4", run_all = FALSE)
+```
+
+Indeed, the pitching categories are strongly correlated with their hitting counterparts. All four of the pitching categories follow this pattern.
+
+## 2. Data Preparation
+
+We begin by devising a strategy for the NAs. We can eliminate the Batting_HBP and Baserun_CS columns because they have too many NA's.  We also create flags for the other columns with significant NA's.
+
+We are particularly interested in the SO columns because they do not appear random, and investigation establishes that they have complete overlap with each other.  Fielding_DP and BR_SB aslo have some overlap.  These may relate to eras of baseball when certain statistics were not collected.  (see Fig. 5)
+
+```{r}
+
+dfTrain1 <- dfTrain %>%
+  dplyr::select(-BATTING_HBP, -BASERUN_CS)
+
+dfTrain2 <- dfTrain1 %>%
+  mutate(PSO_Missing_Flag = ifelse(is.na(PITCHING_SO),1,0), BSO_Missing_Flag = ifelse(is.na(BATTING_SO),1,0), BRSB_Missing_Flag = ifelse(is.na(BASERUN_SB),1,0), FDP_Missing_Flag = ifelse(is.na(FIELDING_DP),1,0))
+
+dfEval1 <- dfTrain %>%
+  dplyr::select(-BATTING_HBP, -BASERUN_CS)
+
+dfEval2 <- dfEval1 %>%
+  mutate(PSO_Missing_Flag = ifelse(is.na(PITCHING_SO),1,0), BSO_Missing_Flag = ifelse(is.na(BATTING_SO),1,0), BRSB_Missing_Flag = ifelse(is.na(BASERUN_SB),1,0), FDP_Missing_Flag = ifelse(is.na(FIELDING_DP),1,0))
+
+dfTrain22 <- dfTrain2 %>%
+  dplyr::select(PSO_Missing_Flag, BSO_Missing_Flag, BRSB_Missing_Flag, FDP_Missing_Flag)
+
+z1 <- EHExplore_TwoCategoricalColumns_Barcharts(dfTrain22, "BSO_Missing_Flag")
+z2 <- EHExplore_TwoCategoricalColumns_Barcharts(dfTrain22, "BRSB_Missing_Flag")
+z3 <- c(z1, z2)
+
+dfTrain2 <- dfTrain2 %>%
+  dplyr::select(-PSO_Missing_Flag)
+
+dfEval2 <- dfEval2 %>%
+  dplyr::select(-PSO_Missing_Flag)
+
+grid.arrange(grobs=z3[c(1,3:4,8)], ncol=2, top="Overlap of NA's Among Columns", bottom = "Fig. 5")
+```
+
+We eliminate the pitching SO column because it is redundant. While not MCAR (missing completely at random), if the Batting_SO column is MAR (missing at random), we may be bale to eliminate these rows, as there are not so many (5% of the total).
+
+One way to investigate the randomness of this missing cohort is to look for interactions between the cohort and other dataset columns. In fact, we see that there are a number of columns with strong, even extreme interactions (see fig. 6).
+
+```{r}
+
+a <- EHExplore_Interactions_Scatterplots(dfTrain2, "TARGET_WINS", "BSO_Missing_Flag")
+
+grid.arrange(a[[6]], a[[10]], a[[11]], a[[12]], a[[14]], ncol=2, top = "Selected Interactions with Missing Batting_SO", bottom = "Fig. 6")
+
+
+```
+
+It is possible this cohort represents a different baseball era when such statistics were not collected.  In any case, we cannot eliminate these rows without losing critical data, so we employ the following strategy: 1) retain the rows and impute a value, 2) create a "missing" flag to keep track of the cohort, and 2) add interaction terms where appropriate.
+
+Before we address imputation, we want to work with the implausible zeros in the dataet.  In particular, we note that the 0s in Pitching_SO and Batting_SO are a complete overlap, and we can see from the histograms that the jump between 0 and the next lowest value is not smooth, and so we will treat them as NA's.  We do the same with batting and pitching HR, since there is also a jump up after zero which suggests it is being used as an indicator of missing value. 
+
+Just so we have some reasonable criteria for imputation strategy, we compare the r-squared of three regressions - with NA's imputed as means, with NA's imputed as medians, and with NA rows eliminated altogether.  
+
+```{r}
+
+dfTrain2 <- dfTrain2 %>%
+  mutate(PITCHING_SO = ifelse(PITCHING_SO==0, NA, PITCHING_SO)) %>%
+  mutate(BATTING_SO = ifelse(BATTING_SO==0, NA, BATTING_SO)) %>%
+  mutate(BATTING_HR = ifelse(BATTING_HR==0, NA, BATTING_HR)) 
+
+ dfTrain2 <- EHPrepare_MissingValues_Imputation(dfTrain2, "TARGET_WINS")
+```
+
+The mean and median have the same r-squared, while the elimination of the rows has a smaller r-squared. We therefore choose to impute the mean.
+
+Not surprisingly, the evaluation dataset shows the same results:
+```{r}
+
+dfEval2 <- dfEval2 %>%
+  mutate(PITCHING_SO = ifelse(PITCHING_SO==0, NA, PITCHING_SO)) %>%
+  mutate(BATTING_SO = ifelse(BATTING_SO==0, NA, BATTING_SO)) %>%
+  mutate(BATTING_HR = ifelse(BATTING_HR==0, NA, BATTING_HR)) 
+
+ dfEval2 <- EHPrepare_MissingValues_Imputation(dfEval2, "TARGET_WINS")
+ 
+ dfTrain_NoTransformations <- dfTrain2
+
+```
+Although outliers and possible bad data appear in a number of places, without domain knowledge we are reluctant to eliminate any other outliers or influential points at this point without good reason. We don't know if extreme numbers are necessarily implausible. Therefore the outliers will remain.
+
+## 3. Data Transformation
+
+__1. We create a flag for hits under 1500__
+
+As previously noted, Pitching_H is surprisingly weak in it's relationship to wins, and in fact appears positive for a large portion of its distribution.  We examine more closely the relationship between pitching hits and wins, paying particular attention to the portion of the relationship where hits are below 3,000 (fig. 7).
+\
+\
+```{r}
+
+dfPH <- dfTrain2 %>%
+  dplyr::select(TARGET_WINS, PITCHING_H)
+  
+dfPH2 <- dfPH %>%
+  dplyr::filter(PITCHING_H <= 3000)
+
+x1 <- EHExplore_TwoContinuousColumns_Scatterplots(dfPH, "TARGET_WINS")
+x2 <- EHExplore_TwoContinuousColumns_Scatterplots(dfPH2, "TARGET_WINS")
+
+grid.arrange(x1[[2]], x2[[2]], ncol=2, top="Pitching_H Against Wins, All Records (left) and Hits Below 3000 (right)", bottom="Fig.7")
+
+
+dfTrain2 <- dfTrain2 %>%
+  mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0))
+
+dfEval2 <- dfEval2 %>%
+  mutate(Pitch_h_Under1500 = ifelse(PITCHING_H<=1500, 1, 0))
+
+#EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfTrain2, "Pitch_h_Under1500")
+```
+
+We can see here the positive correlation between pitching_h and wins.  While we can't explain the phenomenon, we can account for it statistically by adding a binary flag for records with hits under 1500.  
+
+__2. We create an interaction between Fielding_DP and hits.__
+
+The Fielding_DP correlation with Target Wins is surprising, since making double plays should help a team win.  On the other hand, a team that makes double plays is also a team that gives up hits.
+
+We therefore create an interaction term for Fielding_DP and Pitching_H.
+
+
+```{r}
+
+
+dfTrain2 <- dfTrain2 %>%
+  mutate(DP_times_PH = FIELDING_DP*PITCHING_H) 
+
+dfEval2 <- dfEval2 %>%
+  mutate(DP_times_PH = FIELDING_DP*PITCHING_H) 
+  
+a <- summary(lm(TARGET_WINS ~ FIELDING_DP, dfTrain2))$adj.r.squared
+b <- summary(lm(TARGET_WINS ~ FIELDING_DP + PITCHING_H, dfTrain2))$adj.r.squared
+c <- summary(lm(TARGET_WINS ~ FIELDING_DP + PITCHING_H + DP_times_PH, dfTrain2))$adj.r.squared
+
+
+```
+
+__3. We drop PITCHING_HR because it is an implausibly close match with HITTING_HR.__
+
+Like many pitching columns, Pitching_HR is unexpectedly positively correlated with wins.  However, what makes this column truly implausible is how close a match it is with BATTING_HR.  The scatterplot below (Fig. 8) shows that the vast majority of the figures for pitching HR are exactly the same or within 2 or 3 of Batting HR.  We therefore drop it since this makes no sense.  
+
+```{r}
+
+a <- ggplot(dfTrain2, aes(BATTING_HR, PITCHING_HR)) +
+        EHTheme() +
+  geom_point(fill="navy", color="white") +
+  geom_smooth(method = "loess", color="red", fill="lightcoral") +
+  ggtitle("Batting_HR vs Ptching_HR")
+  
+ grid.arrange(a, bottom="Fig. 8") 
+  
+
+dfTrain2 <- dfTrain2 %>%
+  dplyr::select(-PITCHING_HR)
+
+
+dfEval2 <- dfEval2 %>%
+  dplyr::select(-PITCHING_HR)
+
+```
+__4. We create a flag to account for the bimodal distribution of Batting HR.__
+
+Batting HR has a bimodal distribution (see Fig. 9).  We don't explain this, but speculate that it may be related to different eras of baseball.  Therefore, we create a flag to separate records with less than 80 HR form those with more.
+
+```{r}
+
+dfPH3 <- dfTrain2 %>%
+  dplyr::select(BATTING_HR)
+  
+dfPH4 <- dfPH3 %>%
+  dplyr::filter(BATTING_HR <= 100)
+
+x1 <- EHSummarize_SingleColumn_Histograms(dfPH3)
+x2 <- EHSummarize_SingleColumn_Histograms(dfPH4, hist_nbins = 100)
+
+grid.arrange(x1[[1]], x2[[1]], ncol=2, top="Distribution of Batting HR, All Records (left) and HR below 80 (right)", bottom="Fig.9")
+
+
+dfTrain2 <- dfTrain2 %>%
+  mutate(Bat_hr_Under60 = ifelse(BATTING_HR<=80, 1, 0))
+
+dfEval2 <- dfEval2 %>%
+  mutate(Bat_hr_Under60 = ifelse(BATTING_HR<=80, 1, 0))
+```
+
+
+```{r}
+
+summary(lm(TARGET_WINS ~ BATTING_HR, dfTrain2))$adj.r.squared
+summary(lm(TARGET_WINS ~ BATTING_HR + Bat_hr_Under60, dfTrain2))$adj.r.squared
+
+```
+
+
+## 4. Data Modeling
+
+```{r}
+
+a <- EHModel_Regression_StandardLM(dfTrain_NoTransformations, "TARGET_WINS")
+```
+
+## 5. Model Selection
+
+## 6. Predictions
+
+## 7. Conclusion
+
