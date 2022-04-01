@@ -14,17 +14,14 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
 library(ggsci)
 library(caret)
 library(pROC)
-<<<<<<< HEAD
 library(car)
-=======
->>>>>>> 48fdec58d11f1054c871e8b0054c72a8690896c7
 ```
 ```{r}
 
@@ -63,18 +60,13 @@ EHExplore_Multicollinearity(df, run_all=FALSE)
 
 
 ```
-Mutlicollinearity is highly evident in the database - not surprisingly.  The correlation between rad and tax is over 90%.  Because rad is slightly more correlated, and has slightly less variation, than tax, tax will be dropped from the analysis.
-
-```{r}
-df1 <- df %>%
-  dplyr::select(-tax)
-```
+Mutlicollinearity is highly evident in the database - not surprisingly.  The correlation between rad and tax is over 90%. 
 
 ### 2. Data Preparation
 
 #### A. Interaction terms
 
-The dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low indistrialization and very high industrialization, which may affect the slope of other variables.  The following are just some of the possible interactions affecting the dataset:
+The dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low industrialization and very high industrialization, which may affect the slope of other variables.  The following are just some of the possible interactions affecting the dataset:
 
 ```{r}
 
@@ -100,34 +92,53 @@ grid.arrange(grobs=x, ncol=3, nrow=4)
 
 ```
 
+From these plots, we might draw a number of conclusions.  First, in the most highly industrialized areas the crime rate appears to be high no matter the other factors. Zone 0 areas behave differently from zone 1 areas. In the few schools the pt ratio is very small, crime rates fall when they rise in schools with higher pt ratios.  There may be other conclusions we can draw as well.
+
+#### B. Transformations
+
+When the predictor variable is normally distributed but with different variance for the two values of y, we may try a quadratic function of x.  rm may be considered a reasonable candidate for this.  For skewed distributions, we may include both x and log(x).  nox, age, dis and lstat may be candidates for this. 
+
+
+### 3. Build Models
+
+We begin with the base model (include all original variables form the dataset).  We split the data 80/20 to compare a training model to a test set:
+
 ```{r}
-
-#df <- EHPrepare_ScaleAllButTarget(df, "target")
-
-df22 <- df %>%
-  mutate(ptOver13 = as.numeric(ifelse(ptratio>13,1,0)))
-
-str(df22)
-
-EHExplore_Interactions_Scatterplots(df22, "target", "ptOver13")
-EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(df22, "ptOver13")
-EHExplore_TwoCategoricalColumns_Barcharts(df22, "ptOver13")
-
-```
-```{r}
-
-dftt <- df22 %>%
-  dplyr::select(target, ptOver13)
-
-table(dftt)
-
-df222 <- df22 %>%
-  group_by(ptOver13) %>%
-  summarize(ave_lstat = ave(lstat), ave_medv=ave(medv), ave_target=ave(target))
-print (df222)
+EHModel_Regression_Logistic(df, "target")
 
 ```
 
+The base model alone is an excellent predictor of crime rate. Only 4 of the 12 predictors are not significant.
+
+
+Now we try a modle with all of our transformations and interaction terms:
+
+```{r}
+
+dfInt2 <- dfInt %>%
+  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+```
+
+```{r include=FALSE}
+
+acc = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt2, "target")
+  acc[i]=q[2]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+print(aveq)
+
+```
+
+
+Our AIC is actually lower, but the model does not do a better job predicting outcomes.
  
 ```{r}
 
@@ -156,24 +167,19 @@ str(df)
  mmps(m2)
 
 ```
-
-
 ```{r}
 
 df2 <- df %>%
   mutate_at(c(1:12), scale)
 
-for (i in 1:10)
-{
-  a <- EHModel_Regression_Logistic(df2, "target")
-}
+EHModel_Regression_Logistic(df2, "target")
 
 ```
 
 ```{r}
 
 df1 <- df %>%
-  dplyr::select(nox, ptratio, rm, target)
+  dplyr::select(nox, dis, rad, ptratio, medv, target)
 
 EHModel_Regression_Logistic(df1, "target")
 
@@ -185,8 +191,6 @@ dfT <- df %>%
   mutate(TaxOver600 = ifelse(tax>=600,1,0))
 
 EHExplore_Interactions_Scatterplots(dfT, "target", "TaxOver600")
-library(stats)
-interaction.plot(dfT$TaxOver600, df$target, df$indus)
 
 ```
 
@@ -225,10 +229,6 @@ df6 <- df5 %>%
   dplyr::select(-IndusOver16) %>%
   mutate(zn=log(zn+1))
 
-for (i in 1:10)
-{
-  a <- EHModel_Regression_Logistic(df5, "target")
-}
 
 plot(EHModel_Regression_Logistic(df6, "target"))
 
