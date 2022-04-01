@@ -21,7 +21,10 @@ library(gridExtra)
 library(ggsci)
 library(caret)
 library(pROC)
+<<<<<<< HEAD
 library(car)
+=======
+>>>>>>> 48fdec58d11f1054c871e8b0054c72a8690896c7
 ```
 ```{r}
 
@@ -153,19 +156,24 @@ str(df)
  mmps(m2)
 
 ```
+
+
 ```{r}
 
 df2 <- df %>%
   mutate_at(c(1:12), scale)
 
-EHModel_Regression_Logistic(df2, "target")
+for (i in 1:10)
+{
+  a <- EHModel_Regression_Logistic(df2, "target")
+}
 
 ```
 
 ```{r}
 
 df1 <- df %>%
-  dplyr::select(nox, dis, rad, ptratio, medv, target)
+  dplyr::select(nox, ptratio, rm, target)
 
 EHModel_Regression_Logistic(df1, "target")
 
@@ -177,6 +185,8 @@ dfT <- df %>%
   mutate(TaxOver600 = ifelse(tax>=600,1,0))
 
 EHExplore_Interactions_Scatterplots(dfT, "target", "TaxOver600")
+library(stats)
+interaction.plot(dfT$TaxOver600, df$target, df$indus)
 
 ```
 
@@ -215,6 +225,10 @@ df6 <- df5 %>%
   dplyr::select(-IndusOver16) %>%
   mutate(zn=log(zn+1))
 
+for (i in 1:10)
+{
+  a <- EHModel_Regression_Logistic(df5, "target")
+}
 
 plot(EHModel_Regression_Logistic(df6, "target"))
 
