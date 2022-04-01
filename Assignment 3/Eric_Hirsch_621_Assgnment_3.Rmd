@@ -1,26 +1,35 @@
 ---
-title: "Untitled"
+title: "Eric_Hirsch_621_Assignment_3"
 author: "Eric Hirsch"
-date: "3/8/2022"
-output: html_document
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 ```
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
 library(ggsci)
+library(caret)
+library(pROC)
+library(car)
 ```
 ```{r}
 
 df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
 ```
+
+### 1. Data Exploration
+
 
 ```{r}
 
@@ -28,24 +37,121 @@ summary(df)
 str(df)
 
 ```
+
+#### A. Summary Statistics
+
+The data consists of 466 observations and 13 variables, all numeric.  Two are binary, including the target. There are no missing values.  The target appears to be relatively balanced (which makes sense, as it is an indicator of being above or below the median.)
+
+
 ```{r}
 library(psych)
 
-EHSummarize_StandardPlots(df, "target", type="box")
-EHExplore_Multicollinearity(df, run_all=TRUE)
+a <- EHSummarize_StandardPlots(df, "target", type="box")
+```
+
+Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all opf them which identifies certain areas as highly industrial, as opposed to the mixed industrial and residential areas for the rest of the observations.  
+
+Most of the correlations are unsurprising, with the exception of tax rate, which increases with increase in crime.
+
+#### B. Multicollinearity
+
+```{r}
+EHExplore_Multicollinearity(df, run_all=FALSE)
+
+
+```
+Mutlicollinearity is highly evident in the database - not surprisingly.  The correlation between rad and tax is over 90%.  Because rad is slightly more correlated, and has slightly less variation, than tax, tax will be dropped from the analysis.
+
+```{r}
+df1 <- df %>%
+  dplyr::select(-tax)
+```
+
+### 2. Data Preparation
+
+#### A. Interaction terms
+
+The dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low indistrialization and very high industrialization, which may affect the slope of other variables.  The following are just some of the possible interactions affecting the dataset:
+
+```{r}
+
+dfInt <- df %>%
+    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
+    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
+b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
+c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
+d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
+e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
+
+x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
+
+grid.arrange(grobs=x, ncol=3, nrow=4)
 
 ```
 
 ```{r}
 
-dfM <- df %>%
-  mutate(znM = zn*-1, rmM = rm*-1 )
+#df <- EHPrepare_ScaleAllButTarget(df, "target")
+
+df22 <- df %>%
+  mutate(ptOver13 = as.numeric(ifelse(ptratio>13,1,0)))
+
+str(df22)
+
+EHExplore_Interactions_Scatterplots(df22, "target", "ptOver13")
+EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(df22, "ptOver13")
+EHExplore_TwoCategoricalColumns_Barcharts(df22, "ptOver13")
+
+```
+```{r}
+
+dftt <- df22 %>%
+  dplyr::select(target, ptOver13)
+
+table(dftt)
+
+df222 <- df22 %>%
+  group_by(ptOver13) %>%
+  summarize(ave_lstat = ave(lstat), ave_medv=ave(medv), ave_target=ave(target))
+print (df222)
+
 ```
 
  
 ```{r}
 
-EHModel_Regression_Logistic(df, "target")
+#a <- EHModel_Regression_Logistic(df, "target")
+
+  logistic_model <- glm(target ~ .,
+                        data = df,
+                        family = "binomial")
+
+str(df)
+
+  print(logistic_model)
+ #mmps(logistic_model)
+
+  #df22$ptratio = scale(df22$ptratio)
+ 
+ df23 <- df22 %>%
+   dplyr::filter(ptratio>13)
+ 
+
+ 
+   m2 <- glm(target ~ .,
+                data = df23,
+                family = "binomial")
+     print(m2)
+ mmps(m2)
+
 ```
 ```{r}
 
@@ -79,7 +185,7 @@ EHExplore_Interactions_Scatterplots(dfT, "target", "TaxOver600")
 dfT2 <- df %>%
   mutate(IndusOver16 = ifelse(indus>=16,1,0))
 
-EHExplore_Interactions_Scatterplots(dfT2, "target", "IndusOver16")
+wrap_plots(EHExplore_Interactions_Scatterplots(dfT2, "target", "IndusOver16"))
 
 ```
 
@@ -88,8 +194,8 @@ EHExplore_Interactions_Scatterplots(dfT2, "target", "IndusOver16")
 df4 <- dfT %>%
   mutate(lstatOver12 = ifelse(lstat>12,1,0), Inter_taxOver600_lstat = TaxOver600*lstat, Inter_lstatOver12_medv = lstatOver12*medv, IndusOver16 = ifelse(indus>=16,1,0)) 
 
-EHExplore_TwoCategoricalColumns_Barcharts(dfT, "TaxOver600")
-EHExplore_Interactions_Scatterplots(df4, "target", "lstatOver12")
+#EHExplore_TwoCategoricalColumns_Barcharts(dfT, "TaxOver600")
+wrap_plots(EHExplore_Interactions_Scatterplots(df4, "target", "lstatOver12"))
 ```
 
 ```{r}
@@ -103,15 +209,138 @@ plot(EHModel_Regression_Logistic(df4, "target"))
 
 
 df5 <- df4 %>%
-  dplyr::filter(rownames(df4) != "338")
+  dplyr::filter(rownames(df4) != 338)
 
 df6 <- df5 %>%
   dplyr::select(-IndusOver16) %>%
   mutate(zn=log(zn+1))
 
 
-plot(EHModel_Regression_Logistic(df5, "target"))
+plot(EHModel_Regression_Logistic(df6, "target"))
 
 
 ```
+
+```{r}
+
+df11 <- df5 %>%
+  dplyr::select(target, zn, nox, age, dis, rad, ptratio, medv, indus, IndusOver16) %>%
+  mutate(inter = indus*IndusOver16)
+
+EHModel_Regression_Logistic(df11, "target")
+
+```
+
+
+```{r}
+
+```
+
+Building Interactions
+```{r}
+
+dfInt <- df %>%
+  mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(ptOver13 = as.numeric(ifelse(ptratio>13,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+EHModel_Regression_Logistic(dfInt, "target")
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "MedvBelow50")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+
+```
+
+```{r}
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "NoxOverPoint8")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+```
+
+```{r}
+
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+```
+
+```{r}
+
+
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "lstatOver12")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver13")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
+grid.arrange(grobs=a[1:9], ncol=3, nrow=3)
+grid.arrange(grobs=a[10:18], ncol=3, nrow=3)
+grid.arrange(grobs=a[19:20], ncol=2, nrow=1)
+
+  
+#LstatOver12
+#IndusOver16
+#ptOver13
+#ZnOver0
+#NoxOverPoint8
+#radOver15
+#TaxOver600
+#ptratioBelow20
+#medvBelow50
+
+
+
+
+
+
+
+
+```
+
+```{r}
+
+table(dfInt$ZnOver0, dfInt$NoxOverPoint)
+
+```
+
+```{r}
+
+dfInt2 <- dfInt %>%
+  mutate(inter_z_rm = ZnOver0*rm) %>%
+  mutate(inter_z_medv = ZnOver0*medv) %>%
+  mutate(inter_z_indus = ZnOver0*indus) %>% 
+  mutate(inter_lstatOver12_pt = lstatOver12*ptratio) %>%
+  mutate(inter_tax_rm = TaxOver600*indus) 
+
+dfInt3 <- dfInt2 %>%
+  dplyr::select(inter_z_rm, inter_z_medv,inter_z_indus, inter_lstatOver12_pt, inter_tax_rm, zn, rm, medv, indus, ZnOver0, lstatOver12, TaxOver600, target)
+
+EHModel_Regression_Logistic(dfInt2, "target")
+  
+```
+
 
