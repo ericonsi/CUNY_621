@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -247,7 +247,7 @@ print(paste("AIC: ", aicq))
 
 The model does a better job predicting outcomes (accuracy = .94) than the base model, and the AIC for the smaller model falls from 171 to 134. 
 
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 93% accuracy and an AIC of 163 for the full model.*__
+__*The final results for this model, averaging 100 rounds on an 80/20 split are 94% accuracy and an AIC of 163 for the full model.*__
 
 #### C. Enhanced Model with Interaction Terms
 
@@ -378,5 +378,5 @@ head(a)
 
 We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
 
-Several enhancements to the model increased accuracy and lowered AIC.  First, some predictors were transformed with the log or square to improve fit. Second, dummy variables were introduced to capture the fact that highly industrial areas appeared to operate by a different logic than mixed use areas.  interaction terms to model this phenomenon did not improve the model.  The final model 93% accurate.
+Several enhancements to the model increased accuracy and lowered AIC.  First, some predictors were transformed with the log or square to improve fit. Second, dummy variables were introduced to capture the fact that highly industrial areas appeared to operate by a different logic than mixed use areas.  interaction terms to model this phenomenon did not improve the model.  The final model 94% accurate.
 
