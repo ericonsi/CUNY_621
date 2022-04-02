@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -50,6 +50,8 @@ a <- EHSummarize_StandardPlots(df, "target", type="box")
 ```
 
 Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all opf them which identifies certain areas as highly industrial, as opposed to the mixed industrial and residential areas for the rest of the observations.  
+
+
 
 Most of the correlations are unsurprising, with the exception of tax rate, which increases with increase in crime.
 
@@ -103,15 +105,48 @@ When the predictor variable is normally distributed but with different variance 
 
 We begin with the base model (include all original variables form the dataset).  We split the data 80/20 to compare a training model to a test set:
 
+
 ```{r}
-EHModel_Regression_Logistic(df, "target")
+EHModel_Regression_Logistic(df, "target", splitRatio = .99)
 
 ```
 
-The base model alone is an excellent predictor of crime rate. Only 4 of the 12 predictors are not significant.
+
+```{r include=FALSE}
+
+dfx <- df %>%
+  dplyr::select(-rm, -lstat, -chas, -indus)
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfx, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(aveq)
+print(aicq)
 
 
-Now we try a modle with all of our transformations and interaction terms:
+```
+
+The base model alone is an excellent predictor of crime rate. Only 4 of the 12 predictors are not significant and accuracy is over 91%. AIC is 218.
+
+When we remove the non-significant variables the prediction stays at 91% but the AIC falls slightly to 215.
+
+
+Now we try a model with all of ourdummy variables from above:
 
 ```{r}
 
@@ -121,25 +156,155 @@ dfInt2 <- dfInt %>%
 
 ```{r include=FALSE}
 
+z <- EHModel_Regression_Logistic(dfInt2, "target", splitRatio = .99 )
+```
+
+```{r include=FALSE}
 acc = list()
+AIC = list()
 
 for (i in 1:100)
 {
   q <- EHModel_Regression_Logistic(dfInt2, "target")
   acc[i]=q[2]
+  AIC[i]=q[3]
 }
 
 ```
 ```{r}
 accv <- unlist(acc)
 aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
 print(aveq)
+print(aicq)
 
 ```
 
 
-Our AIC is actually lower, but the model does not do a better job predicting outcomes.
- 
+Our AIC is actually lower (AIC=178), and the model does a better job predicting outcomes (Accuracy = .95).  Now we'll perform backward elimination to see if we can reduce AIC even further to avoid the possibility of overfitting.
+
+```{r include = FALSE}
+
+dfInt4 <- dfInt2 %>%
+  dplyr::select(-NoxOverPoint8, -nox)
+
+EHModel_Regression_Logistic(dfInt4, "target")
+
+```
+Our best model ultimately is below (the tax categories are not significant but nonetheless contribute to higher accuracy and lower AIC.)  The final results for this model averaging 100 rounds on an 80/20 split are 95.5% accuracy and an AIC of 162.7.
+
+
+```{r}
+dfInt5 <- dfInt4 %>%
+  dplyr::select(-radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv )
+
+dfInt5 <- dfInt5 %>%
+  dplyr::filter(rownames(dfInt5) != 338)
+
+z <- EHModel_Regression_Logistic(dfInt5, "target", splitRatio = .99 )
+```
+```{r  include=FALSE}
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt5, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(aveq)
+print(aicq)
+
+```
+
+```{r}
+
+dfInt6 <- dfInt2 %>%
+  mutate(inter_z_rm = ZnOver0*rm) %>%
+  mutate(inter_age_indus = IndusOver16*age) %>%
+  mutate(inter_rad_lstat = radOver10*lstat) %>% 
+  mutate(inter_pt_rad = ptOver14*rad) 
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic(dfInt6, "target", splitRatio = .99)
+
+```
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt6, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(aveq)
+print(aicq)
+
+```
+
+```{r}
+dfSmall <- dfInt5 %>%
+  dplyr::select(dis_log, age_log, rmSquared, ptratio, dis, age , rm, target)
+
+EHModel_Regression_Logistic(dfSmall, "target")
+```
+
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfSmall, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(aveq)
+print(aicq)
+
+```
+
+```
+
 ```{r}
 
 #a <- EHModel_Regression_Logistic(df, "target")
