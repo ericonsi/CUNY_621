@@ -1,0 +1,824 @@
+---
+title: "Eric_Hirsch_621_Assignment_3"
+subtitle: "Predicting Town Crime Rates" 
+author: "Eric Hirsch"
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+devtools::install_github("ericonsi/EHData")
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+```
+```{r}
+
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+
+```
+
+```{r}
+
+summary(df)
+str(df)
+
+```
+
+```{r}
+library(psych)
+
+a <- EHSummarize_StandardPlots(df, "target", type="box")
+```
+
+
+```{r}
+EHExplore_Multicollinearity(df, run_all=FALSE)
+
+
+```
+
+
+```{r}
+
+dfInt <- df %>%
+    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
+    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+dfEval <- dfEval %>%
+    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
+    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
+b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
+c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
+d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
+e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
+
+x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
+
+grid.arrange(grobs=x, ncol=3, nrow=4)
+
+```
+
+```{r}
+EHModel_Regression_Logistic(df, "target", splitRatio = 1)
+
+```
+
+```{r include=FALSE}
+
+dfx <- df %>%
+  dplyr::select(-rm, -lstat, -chas, -indus)
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfx, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+```{r}
+
+dfInt2 <- dfInt %>%
+  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+
+dfEval <- dfEval %>%
+  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+  
+```
+
+```{r include=FALSE}
+
+z <- EHModel_Regression_Logistic(dfInt2, "target", splitRatio = 1 )
+```
+
+```{r}
+
+dfInt5 <- dfInt2 %>%
+  dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
+
+dfEval <- dfEval %>%
+    dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
+
+EHModel_Regression_Logistic(dfInt5, "target", splitRatio = 1)
+
+```
+
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt5, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+```{r}
+
+dfInt6 <- dfInt2 %>%
+  mutate(inter_z_rm = ZnOver0*rm) %>%
+  mutate(inter_age_indus = IndusOver16*age) %>%
+  mutate(inter_rad_lstat = radOver10*lstat) %>% 
+  mutate(inter_pt_rad = ptOver14*rad) 
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic(dfInt6, "target", splitRatio = 1)
+
+```
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt6, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+```{r}
+
+  m1 <- glm(target ~ .,
+                        data = dfInt5,
+                        family = "binomial")
+  print(m1)
+  plot(m1)
+  mmps(m1)
+```
+
+```{r include=FALSE}
+
+
+dfInt9 <- dfInt5 %>%
+  dplyr::filter(rownames(dfInt5) !="338" & rownames(dfInt5) !="280")
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt9, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic(dfInt9, "target", xseed = 31)
+
+```
+
+```{r}
+
+makePredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=dfEval, type="response"))
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
+}
+
+a <- makePredictions(m1)
+
+head(a)
+
+```
+
+The EHData library, used extensively in this code:
+
+
+```{r}
+
+library(devtools)
+library(roxygen2)
+library(Hmisc)
+library(psych)
+library(tidyverse)
+library(skimr)
+library(purrr)
+library(tidyr)
+library(tidyverse)
+library(gridExtra)
+library(lubridate)
+library(fastDummies)
+library(data.table)
+library(mltools)
+library(MASS)
+library(car)
+library(patchwork)
+library(ggthemes)
+library(tinytex)
+library(stats)
+library(ggsci)
+library(scales)
+library(naniar)
+library(Amelia)
+library(caret)
+library(pROC)
+
+EHTheme <- function(){
+  
+  x <- theme(axis.title.x = element_text(size = 12), axis.title.y = element_text(size = 9), axis.text.x = element_blank(), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray"))
+  
+  return (x)
+  
+}
+
+
+EHSummarize_MissingValues <- function(df)
+{
+
+  library(naniar)
+  
+  #1. Missing Completely at Random (MCAR):
+  #2. Missing at Random (MAR):
+  #3. Missing Not at Random (MNAR)
+  
+  list12 = list()
+  
+  list12[[1]] <- gg_miss_var(df)
+  list12[[2]] <- vis_miss(df)
+  list12[[3]] <- gg_miss_upset(df)
+  
+  return(list12)
+
+  
+}
+
+
+EHPrepare_MissingValues_Imputation <- function(df, y, impute = "mean", print_all = FALSE)
+{
+  
+  #1. Missing Completely at Random (MCAR):
+  #2. Missing at Random (MAR):
+  #3. Missing Not at Random (MNAR)
+  
+  dfImputedMean <- data.frame(
+    sapply(df, function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x)))
+  
+  dfImputedMedian <- data.frame(
+    sapply(df, function(x) ifelse(is.na(x), median(x, na.rm = TRUE), x)))
+  
+  dfOmit <- na.omit(df)
+  
+  #set.seed(042760)
+  #dfMultiple <- Amelia::amelia(df, m=25)
+  
+  
+  fla <- substitute(n ~ ., list(n = as.name(y)))
+  m1 <- lm(fla, dfImputedMean)
+  step1 <- stepAIC(m1, trace=FALSE)
+  s1 <- summary(step1)$adj.r.squared
+  
+  fla2 <- substitute(n ~ ., list(n = as.name(y)))
+  m2 <- lm(fla2, dfImputedMedian)
+  step2 <- stepAIC(m2, trace=FALSE)
+  s2 <- summary(step2)$adj.r.squared
+  
+  fla3 <- substitute(n ~ ., list(n = as.name(y)))
+  m3 <- lm(fla3, dfOmit)
+  step3 <- stepAIC(m3, trace=FALSE)
+  s3 <- summary(step3)$adj.r.squared
+  
+  #fla4 <- substitute(n ~ ., list(n = as.name(y)))
+  #m4 <- lm(fla4, dfMultiple)
+  #step4 <- stepAIC(m4, trace=FALSE)
+  #s4 <- summary(step4)$adj.r.squared
+  
+  l1 <- vector(mode = "list", length = 5)
+  names(l1) <- c("df", "type", "r2mean", "r2median", "r2omit")
+  
+  #l1 <- vector(mode = "list", length = 6)
+  #names(l1) <- c("df", "type", "r2mean", "r2median", "r2omit", "r2multiple")
+  
+  l1$r2mean = s1
+  l1$r2median = s2
+  l1$r2omit = s3
+  #l1$r2multiple = s4
+  
+  if (impute == "mean") {
+    l1$type = "mean"
+    l1$df=dfImputedMean
+  }
+  else if (impute == "median") {
+    l1$type = "median"
+    l1$df=dfImputedMedian
+  }
+  else if (impute == "omit") {
+    l1$type = "omit"
+    l1$df=dfOmit
+  }
+  #else if (impute == "multiple") {
+  #  l1$type = "multiple"
+  #  l1$df=dfMultiple
+  #}
+  
+  print(c("type:", l1$type))
+  print(c("r2mean:", round(l1$r2mean,4)))
+  print(c("r2median:", round(l1$r2median,4)))
+  print(c("r2omit", round(l1$r2omit,4)))
+ # print(c("r2multiple", round(l1$r2multiple,4)))
+  
+    if (print_all) {
+      print(summary(step1))
+      print(summary(step2))
+      print(summary(step3))
+      #print(summary(step4))
+    }
+    
+    return (l1$df)
+  
+}
+
+EHExplore_Interactions_Scatterplots <- function(df, y, interaction) {
+  
+  library(ggsci)
+  
+  df <- select_if(df, is.numeric)
+  
+  v <- as.vector(df[,interaction])
+
+  xtext1 = as.data.frame(aggregate(data.frame(count = v), list(value = v), length))
+  df[interaction][df[interaction] == "0"] <- paste0("0 (n=", xtext1$count[1], ")")
+  df[interaction][df[interaction] == "1"] <- paste0("1 (n=", xtext1$count[2], ")")
+  
+  
+  df[,interaction] <- as.factor(df[,interaction])
+  
+  plot_list <- list()
+  
+  for(i in 1:ncol(df)) {     
+    
+    p <- eval(substitute(ggplot(df, aes_string(df[ , i], y, color=interaction)) +
+                           geom_point(alpha=.1) +
+                           geom_smooth(method = "lm") +
+                           xlab(colnames(df)[i]) +
+                           theme(title = element_text(size=9), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), panel.grid.major.x = element_line(color="gray"), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
+                           scale_color_d3()+
+                           scale_fill_d3()+
+                           ggtitle(colnames(df)[i]), list(i=i)))
+    plot_list[[i]] <- p 
+    
+  }
+  return(plot_list)
+}
+
+EHSummarize_SingleColumn_Boxplots <- function(df, font_size=7)
+{  
+  df <- select_if(df, is.numeric)
+
+
+plot_list2 <- list()
+
+for(i in 1:ncol(df)) {     
+  
+  qp <- toString(head(sort(round(df[,i],2)),5))
+  qz <- toString(tail(sort(round(df[,i],2)),5))
+  qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
+  
+  qk <- gsub('\\\\','', qk)
+  
+  p <- eval(substitute(ggplot(df, aes(df[,i])) +
+                         coord_flip() +  
+                         xlab(colnames(df)[i])  +
+                         ylab(qk) +
+                         theme(axis.title.x = element_text(size = font_size), axis.title.y = element_text(size = 9), axis.text.x = element_blank(), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
+                         geom_boxplot(), list(i=i)))
+  
+  plot_list2[[i]] <- p 
+  
+  
+}
+return (plot_list2)
+}
+
+
+#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\CUNY_621\\Baseball\\moneyball-training-data.csv", header=TRUE)
+#dfTrain <- dfTrain %>%
+#  mutate(xq = ifelse(TEAM_PITCHING_H >1500, 1, 0))
+#EHExplore_Correlations_Boxplots(dfTrain, "xq")
+
+EHSummarize_SingleColumn_Histograms <- function(df, font_size = 7, hist_nbins = 20)
+{
+  
+  df <- select_if(df, is.numeric)
+  
+  plot_list2 <- list()
+  
+  for(i in 1:ncol(df)) {     
+    
+    qp <- toString(head(sort(round(df[,i],2)),5))
+    qz <- toString(tail(sort(round(df[,i],2)),5))
+    qk <- str_c("L:   ", qp, "\\\n", "H:   ", qz)
+    
+    qk <- gsub('\\\\','', qk)
+    
+    p <- eval(substitute(ggplot(df, aes(df[,i])) +
+                           ylab(colnames(df)[i])  +
+                           xlab(qk) +
+                           theme(axis.title.x = element_text(size = font_size), axis.title.y = element_text(size = 9), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(size=8),  panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_blank(), panel.background = element_rect(fill = "slategray2", color="darkslategray"))  + 
+                           geom_histogram(bins=hist_nbins, fill="white", aes(y = stat(density))) +
+                           geom_density(col = "red"), list(i=i)))
+    plot_list2[[i]] <- p 
+    
+  }
+  return (plot_list2)
+}
+
+
+EHExplore_TwoContinuousColumns_Scatterplots <- function(df, y, flip=FALSE)
+{
+  plot_list <- list()
+  
+  df <- select_if(df, is.numeric)
+  
+  for(i in 1:ncol(df)) {
+    
+    ct <- cor.test(df[,i], df[,y])
+    
+    xText <- str_c("Correlation: ", round(ct$estimate,2), "   p value: ", round(ct$p.value,2))
+    
+    x1 = df[[i]]
+    y1 =y
+    
+    if(flip)
+    {
+      x1=y
+      y1=df[[i]]
+    }
+    
+    p <- ggplot(df, aes_string(x1, y1)) +
+      geom_point(fill="navy", color="white") +
+      geom_smooth(method = "loess", color="red", fill="lightcoral") +
+      ylab(y) +
+      xlab(xText) +
+      theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), axis.ticks.x = element_blank(), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray2", color="darkslategray")) +
+      ggtitle(colnames(df)[i])
+    
+    p <- eval(substitute(p, list(i=i)))
+    plot_list[[i]] <- p 
+    
+  }
+  return(plot_list)
+}
+
+
+EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots <- function(df, y)
+{
+  plot_list3 <- list()
+  
+  df <- select_if(df, is.numeric)
+  
+  df$NumericY <- as.numeric(df[,y])
+  
+  df[,y] <- as.factor(df[,y])
+  
+  for(i in 1:ncol(df)) {
+    
+    df$NumericX <- as.numeric(df[,i])
+    
+    ct <- cor.test(df$NumericX, df$NumericY)
+    
+    xText <- str_c("Correlation: ", round(ct$estimate,2), "   p value: ", round(ct$p.value,2))
+    
+    p <- ggplot(df, aes_string(x=df[,i], y, fill=y)) +
+      xlab(colnames(df)[i])  +
+      ylab(xText) +
+      theme(axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
+      scale_color_d3()+
+      scale_fill_d3()+                     
+      geom_boxplot()+
+      coord_flip() 
+    
+    plot_list3[[i]] <- eval(substitute(p, list(i=i)))
+    
+  }
+  return(plot_list3)
+}
+
+
+EHSummarize_StandardPlots <-function(data, y, return_list = FALSE, h_nbins = 20, print=TRUE, type="scatter")
+{  
+  
+  list1 <- EHSummarize_SingleColumn_Boxplots(data)
+  list2 <- EHSummarize_SingleColumn_Histograms(data, hist_nbins =  h_nbins)
+  
+  if(type=="scatter"){
+    list3 <- EHExplore_TwoContinuousColumns_Scatterplots(data, y)
+  } else if (type=="box"){
+    list3 <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(data, y)
+  }
+  
+  zz2 <- list()
+
+  
+  for(i in 1:length(list1)) {
+    zz2[i*3-2] <- list1[i]
+    zz2[i*3-1] <- list2[i]
+    zz2[i*3] <- list3[i]
+  }
+  
+  if (print) {
+    lenZ <- length(zz2)
+    quotient <- lenZ %/% 9
+    gap <- lenZ - quotient*9
+    gaprows <- gap/3
+    
+    if (lenZ>=9) {
+    for(i in 1:quotient) { 
+      
+      start <- (i-1)*9 + 1
+      finish <- start + 8
+      
+      grid.arrange(grobs=zz2[c(start:finish)], ncol=3)
+      
+    }
+    }
+    
+    if (gaprows>0) {
+      
+      start <- quotient*9 + 1
+      finish <- start + gaprows*3 - 1
+      
+      grid.arrange(grobs=zz2[c(start:finish)], ncol=3, nrow=gaprows)
+    }  
+  }
+  
+  if (return_list) {
+    return (zz2)
+  }
+  
+}
+
+EHExplore_Multicollinearity <-function(df, run_all=FALSE, title="Heatmap for Multicollinearity Analysis") {
+  
+  dfCor <- as.data.frame(cor(df))
+  
+  library(corrplot)
+  my_matrix <- df[]
+  cor_res <- cor(my_matrix, use = "na.or.complete")
+  
+  if (run_all) {
+    print(dfCor)
+    corrplot(cor_res, method = 'number')
+  }
+  
+  library(corrplot)
+  my_matrix <- df[]
+  cor_res <- cor(my_matrix, use = "na.or.complete")
+  
+  z <- corrplot(cor_res, title = title, mar=c(0,0,2,0), 
+                diag=FALSE, type = "upper", order = "original", tl.col = "black", tl.srt = 45, tl.cex = 0.55)
+  
+  #return (z)
+  
+}
+
+
+EHModel_Regression_StandardLM <- function(df, y, vif=TRUE, tests = TRUE, avplots = TRUE) {
+  
+  fla <- substitute(n ~ ., list(n = as.name(y)))
+  
+  par(mfcol=c(2,2))
+  
+  mod_4 <- lm(fla, df)
+  step3 <- stepAIC(mod_4, trace=FALSE)
+  print(summary(step3))
+  
+  if (vif){
+  print("VIF Analysis")
+  vif_values <- car::vif(step3)
+  print(vif_values)
+  }
+  
+  print(plot(step3))
+  
+  if (tests) {
+  library(lmtest)
+  print(bptest(step3))
+  
+  print(shapiro.test(step3$residuals))
+  }
+  
+  if (avplots) {
+    avPlots(step3)
+  }
+  
+  return(step3)
+  
+}
+
+EHExplore_TwoCategoricalColumns_Barcharts <- function(df, y)
+{
+  
+  plot_list4 <- list()
+  
+  df <- select_if(df, is.numeric)
+  
+  df[,y] <- as.factor(df[,y])
+  
+  for(i in 1:ncol(df)) {
+    
+  
+    df[,i] <- as.factor(df[ ,i])
+    
+    p <- ggplot(df, aes_string(x=df[ , i], fill=y)) +
+      geom_bar(position = "fill") +
+      ylab("Proportion") +
+      xlab(colnames(df)[i]) +
+      stat_count(geom="text", aes(label=stat(count)), position=position_fill(vjust=.5), color="black") +
+      scale_color_d3()+
+      scale_fill_d3()+
+      theme(title = element_text(size=9), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 9), axis.text.x = element_text(size = 8), panel.grid.major.x = element_blank(), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank(), panel.grid.major.y=element_line(color="gray"), panel.background = element_rect(fill = "slategray1", color="darkslategray")) +
+      ggtitle(colnames(df)[i])
+    
+    p <- eval(substitute(p, list(i=i)))
+    plot_list4[[i]] <- p
+  }
+  
+  return (plot_list4)
+}
+
+EHModel_Regression_Logistic <-function(df, y, splitRatio = .8, xseed = 0)
+{
+  library(caTools)
+  library(ROCR)
+  
+  if(xseed>0) {
+    set.seed(xseed)
+  }
+  
+  if(splitRatio==1) {
+    fla <- substitute(n ~ ., list(n = as.name(y)))
+    
+    logistic_model <- glm(fla,
+                          data = df,
+                          family = "binomial")
+    
+    # Summary
+    print(summary(logistic_model))
+    
+    listq = list()
+    listq[1] <- logistic_model
+    listq[2] <- 0
+    listq[3] <- 0
+    
+    return(listq)
+  }
+  
+  split <- sample.split(df, SplitRatio = splitRatio)
+  split
+  
+  train_reg <- subset(df, split == "TRUE")
+  test_reg <- subset(df, split == "FALSE")
+  
+  fla <- substitute(n ~ ., list(n = as.name(y)))
+  
+  logistic_model <- glm(fla,
+                        data = train_reg,
+                        family = "binomial")
+  
+  # Summary
+  print(summary(logistic_model))
+  
+  # Predict test data based on model
+  predict_reg <- predict(logistic_model,
+                         test_reg, type = "response")
+
+  scored_class <- ifelse(predict_reg >0.5, 1, 0)
+  class <- test_reg[,y]
+  
+  dfPred <- data.frame(class, scored_class)
+  
+  dfPred$class <- as.factor(dfPred$class)
+  dfPred$scored_class <- as.factor(dfPred$scored_class)
+  
+  q <-confusionMatrix(data = dfPred$scored_class, reference = dfPred$class)
+  print(q)
+  
+  dfPred_raw <- data.frame(class, predict_reg)
+  
+  roc(class ~ predict_reg, dfPred_raw)
+  
+roc1 <- roc(dfPred_raw$class,
+              dfPred_raw$predict_reg, plot=TRUE)
+print(paste("AUC: ", auc(roc1)))
+print(roc1)
+
+listq = list()
+listq[1] <- logistic_model
+listq[2] <- q$overall['Accuracy']
+listq[3] <- logistic_model$aic
+
+  return(listq)
+}
+
+
+EHPrepare_ScaleAllButTarget <-function(df, y)
+{
+  
+  df1 <- df%>%
+    dplyr::select(-df[,y])
+  
+  df1 <- data.frame(scale(df1))
+  df2 <- df%>%
+    dplyr::select(df[,y])
+  
+  df3 <- cbind(df1,df2)
+  
+  return(df3)
+}
+
+
+
+```
+
