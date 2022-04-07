@@ -71,7 +71,6 @@ What do you see? goes here
 
 #### B. Multicollinearity
 
-Mutlicollinearity is highly evident in the database - not surprisingly, given the discussion above.  The correlation between rad and tax is over 90%. We also see here the correlation between tax rate and level of industrialization (which is also correlated with high crime rates), which explains the counterintuitive result above. 
 
 ```{r}
 #EHExplore_Multicollinearity(df2, run_all=FALSE)
@@ -97,8 +96,6 @@ df5 <- df4 %>%
   dplyr::select(-INDEX, -TARGET_AMT)
 
 
-
-
 ```
 ```{r}
 library(MASS)
@@ -120,6 +117,30 @@ EHExplore_Multicollinearity(df5, run_all = TRUE)
 EHModel_Regression_Logistic(df5, "TARGET_FLAG")
 
 ```
+
+```{r}
+
+
+df5b <- df5 %>%
+  dplyr::select(-CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Home.Maker, -JOB_Doctor, -HOMEKIDS, -AGE, -YOJ, -OLDCLAIM, -EDUCATION_.High.School, -JOB_Clerical, -JOB_Student, -JOB_z_Blue.Collar, -RED_CAR_no)
+
+df5c <- df5b %>%
+  dplyr::select(-CAR_TYPE_Van, -MVR_PTS, -MSTATUS_Yes, -EDUCATION_z_High.School)
+
+#df5d <- df5c %>%
+#  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
+
+EHModel_Regression_Logistic(df5c, "TARGET_FLAG", splitRatio = 1, xseed = 10)
+
+```
+
+
+```{r}
+
+EHModel_Regression_Logistic_Iterations(df5c, "TARGET_FLAG")
+
+```
+
 
 ```{r}
 
@@ -261,10 +282,62 @@ dfEval <- dfEval %>%
   mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
 
 df7 <- df5 %>%
-  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1))
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
   
 
-EHModel_Regression_Logistic(df7, "TARGET_FLAG")
+EHModel_Regression_Logistic_Iterations(df7, "TARGET_FLAG")
+```
+
+
+```{r}
+
+df7b <- df7 %>%
+  dplyr::select(-JOB_Home.Maker, -CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Doctor, -JOB_Clerical, -tif_log, -mvr_pts_log, -carage_log, -clm_freq_log, -CLM_FREQ, -bluebook_log, -yojSquared)
+
+df7c <- df7b %>%
+  dplyr::select(-RED_CAR_no, -YOJ, -JOB_z_Blue.Collar, -EDUCATION_.High.School, -kidsdriv_log, -MVR_PTS)
+
+df7d <- df7c %>%
+  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
+
+df7e <- df7d %>%
+  dplyr::select(-REVOKED_Yes, -JOB_Student, -income_log, -ageSquared, -AGE, -CAR_AGE)
+
+
+df7e <- df7d %>%
+  dplyr::select(-REVOKED_Yes, -JOB_Student, -income_log, -ageSquared, -AGE, -CAR_AGE, -CAR_TYPE_Van)
+
+df7f <- df7e %>%
+  dplyr::select(-homekids_log, -HOMEKIDS)
+
+EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", numOfIterations = 200)
+
+```
+
+
+```{r}
+
+df8 <- df7 %>%
+  dplyr::select(TARGET_FLAG, AGE, TRAVTIME, PARENT1_Yes, CAR_TYPE_Pickup, CAR_TYPE_Sports.Car, CAR_TYPE_z_SUV, JOB_Lawyer, JOB_Manager, JOB_Student, AGE, ageSquared, URBANICITY_z_Highly.Rural..Rural, homeval_log, BLUEBOOK, TIF, SEX_z_F)
+
+EHModel_Regression_Logistic_Iterations(df8, "TARGET_FLAG")
+```
+
+
+
+```{r}
+
+df9 <- df8 %>%
+  dplyr::select(-BLUEBOOK, -TIF, -SEX_z_F)
+
+EHModel_Regression_Logistic_Iterations(df9, "TARGET_FLAG")
+
 ```
 
 

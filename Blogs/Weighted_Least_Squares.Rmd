@@ -25,8 +25,8 @@ library(tidyverse)
 list
 
 library(tidyverse)
-#dfx <- read.csv("D:\\RStudio\\CUNY_621\\AdRevenue.csv", head=TRUE)
-dfx <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\AdRevenue.csv", head=TRUE)
+dfx <- read.csv("D:\\RStudio\\CUNY_621\\AdRevenue.csv", head=TRUE)
+#dfx <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\AdRevenue.csv", head=TRUE)
 
 dfx <- dfx %>% 
   dplyr::select(AdRevenue, Circulation) %>%
@@ -35,6 +35,17 @@ dfx <- dfx %>%
 
 summary(dfx)
 
+
+```
+
+```{r}
+xyz <- list()
+
+
+library(EHData)
+ggplot(dfx,  aes(Circulation, AdRevenue)) +
+      geom_point(fill="navy", color="navy") +
+      geom_smooth(method = "lm", color="red", fill="lightcoral") + EHData::EHTheme()
 
 ```
 
