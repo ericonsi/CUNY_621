@@ -262,9 +262,6 @@ dfEval <- dfEval %>%
 
 df7 <- df5 %>%
   mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1))
-
-df8 <- df5 %>%
-  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1))
   
 
 EHModel_Regression_Logistic(df7, "TARGET_FLAG")
