@@ -70,7 +70,7 @@ df2Crashed <- df4 %>%
   dplyr::filter(TARGET_FLAG==1.0)
 
   dfc5 <- df2Crashed %>%
- dplyr::filter(row_number() %% 10 == 1)  %>%
+#dplyr::filter(row_number() %% 3 == 1)  %>%
   dplyr::select(-INDEX, -TARGET_FLAG)
 
 
@@ -83,7 +83,7 @@ str(dfc5)
 library(psych)
 
 dfc6 <- dfc5 %>%
-  mutate(MVR_PTS_NA = ifelse(is.na(MVR_PTS),0,1), YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
 
 a <- EHSummarize_StandardPlots(dfc6, "TARGET_AMT", type="scatter")
 
@@ -103,20 +103,25 @@ What do you see? goes here
 ```{r}
 library(MASS)
 EHSummarize_MissingValues(dfc5)
-
+```
+```{r}
 dfc6 <- dfc5 %>%
-  mutate(MVR_PTS_NA = ifelse(is.na(MVR_PTS),0,1), YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
 
 dfMissing <- dfc6 %>%
-  dplyr::select(TARGET_AMT, MVR_PTS_NA, YOJ_NA, INCOME_NA, CAR_AGE_NA, HOME_VAL_NA)
+  dplyr::select(TARGET_AMT, YOJ_NA, INCOME_NA, CAR_AGE_NA, HOME_VAL_NA)
 
-ehe
+m1 <- lm(TARGET_AMT~., dfMissing)
+summary(m1)
 
-EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfMissing, "TARGET_AMT")
+boxplot(dfc6$TARGET_AMT, dfc6$CAR_AGE_NA)
 
-#dfc6 <- EHPrepare_MissingValues_Imputation(dfc5, "TARGET_AMT")
+#dfc67 <- EHPrepare_MissingValues_Imputation(dfc5, "TARGET_AMT")
 
+dfM1 <- dfc6 %>%
+  dplyr::select(-CAR_AGE, -INCOME, -HOME_VAL)
 
+EHExplore_Interactions_Scatterplots(dfM1, "TARGET_AMT", "YOJ_NA")
 
 ```
 
@@ -126,12 +131,123 @@ EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfMissing, "TARGET_AMT")
 #EHExplore_Multicollinearity(df5, run_all = TRUE)
 
 ```
+```{r}
+
+#1. Base - outliers and nonormal distributionand heteroskedastic
+
+dfc7 <- na.omit(dfc5)
+aa <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
+hist(aa$residuals)
+
+#2. Remove main outliers - just resuts in new outliers and distribution is the same and still heteroskedastic
+
+dfc71 <- dfc7 %>%
+  dplyr::filter(rownames(dfc7) != 66, rownames(dfc7) != 26, rownames(dfc7) != 183, rownames(dfc7) != 570, rownames(dfc7) != 260, rownames(dfc7) != 147)
+
+bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT")
+hist(bb$residuals)
+
+#3. Log of y - still nonormal (but closer to normal) with outliers, but now homoskedatsic
+
+dfc72 <- dfc7
+dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT)
+cc<- EHModel_Regression_StandardLM(dfc72, "TARGET_AMT")
+hist(cc$residuals)
+
+```
+```{r}
+
+
+# Add log terms - residuals closer to normal but not (not skewed but heavy tailed), and outliers remain
+
+dfc73 <- dfc72 %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+  
+zz <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT")
+print(hist(dfc73$TARGET_AMT))
+print(hist(zz$residuals))
+
+```
+
+```{r}
+
+# above plus massive outlier elimination - no progress
+
+
+#9.5 and 7.5 work
+
+dfc74 <- dfc73 %>%
+  dplyr::filter(TARGET_AMT<9 & TARGET_AMT>8)
+
+#xb <- lm(TARGET_AMT~., dfc74)
+  
+zz <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
+print(hist(dfc74$TARGET_AMT))
+print(hist(zz$residuals))
+```
+
+
+
+```{r}
+
+#robust regression using log model
+
+robust1 <- rlm(TARGET_AMT ~ ., data=zz$model)
+robust2 <- rlm(TARGET_AMT ~ ., data=aa$model)
+robust3 <- rlm(TARGET_AMT ~ ., data=cc$model)
+
+ols1 <- lm(TARGET_AMT ~ ., data=zz$model)
+ols2 <- lm(TARGET_AMT~., data=aa$model )
+ols3 <- lm(TARGET_AMT~., data=cc$model )
+
+
+summary(robust1)
+
+#find residual standard error of ols model
+summary(ols1)$sigma
+
+#find residual standard error of robust model
+summary(robust1)$sigma
+
+summary(ols2)$sigma
+
+#find residual standard error of robust model
+summary(robust2)$sigma
+
+summary(ols3)$sigma
+
+#find residual standard error of robust model
+summary(robust3)$sigma
+
+#Lower is better
+
+
+```
+
+```{r}
+
+dfc9 <- na.omit(dfc5)
+#dfc9$TARGET_AMT = log(dfc9$TARGET_AMT)
+
+robust <- rlm(TARGET_AMT ~ HOMEKIDS + TRAVTIME + MVR_PTS + CAR_AGE + CAR_TYPE_Pickup + CAR_TYPE_Van + RED_CAR_no + JOB_ + SEX_z_F+JOB_Lawyer + JOB_Manager + EDUCATION_.High.School+EDUCATION_Bachelors + EDUCATION_z_High.School, data=dfc9)
+
+ols <- lm(TARGET_AMT ~ HOMEKIDS + TRAVTIME + MVR_PTS + CAR_AGE + CAR_TYPE_Pickup + CAR_TYPE_Van + RED_CAR_no + JOB_ + SEX_z_F+JOB_Lawyer + JOB_Manager + EDUCATION_.High.School+EDUCATION_Bachelors + EDUCATION_z_High.School, data=dfc9)
+
+#find residual standard error of ols model
+summary(ols)$sigma
+
+#find residual standard error of robust model
+summary(robust)$sigma
+
+#Lower is better
+
+```
 
 
 ```{r}
 library(MASS)
-EHModel_Regression_StandardLM(dfc5, "TARGET_AMT")
-
+w <- EHModel_Regression_StandardLM(dfc9, "TARGET_AMT")
+hist(w$residuals)
 ```
 
 ```{r}
@@ -147,6 +263,13 @@ df5c <- df5b %>%
 #  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
 
 EHModel_Regression_Logistic(df5c, "TARGET_FLAG", splitRatio = 1, xseed = 10)
+
+  m1 <- glm(TARGET_FLAG ~ .,
+                        data = df5c,
+                        family = "binomial")
+  #print(m1)
+  plot(m1)
+  mmps(m1)
 
 ```
 
@@ -296,12 +419,16 @@ dfInt2 <- dfInt %>%
 
 dfEval <- dfEval %>%
   mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+```
 
-df7 <- df5 %>%
+```{r}
+
+dfc8 <- dfc7 %>%
   mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
   
-
-EHModel_Regression_Logistic_Iterations(df7, "TARGET_FLAG")
+dfc8$TARGET_AMT <- log(dfc8$TARGET_AMT)
+z <- EHModel_Regression_StandardLM(dfc8, "TARGET_AMT")
+hist(z$residuals)
 ```
 
 
@@ -332,7 +459,8 @@ EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
 
 ```{r}
 
-EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", numOfIterations = 200)
+#EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", numOfIterations = 200)
+EHModel_Regression_Logistic(df7f, "TARGET_FLAG")
 
 ```
 
