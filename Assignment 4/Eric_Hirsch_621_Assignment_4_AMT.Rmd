@@ -85,7 +85,7 @@ library(psych)
 dfc6 <- dfc5 %>%
   mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
 
-a <- EHSummarize_StandardPlots(dfc6, "TARGET_AMT", type="scatter")
+#a <- EHSummarize_StandardPlots(dfc6, "TARGET_AMT", type="scatter")
 
 ```
 
@@ -121,7 +121,7 @@ boxplot(dfc6$TARGET_AMT, dfc6$CAR_AGE_NA)
 dfM1 <- dfc6 %>%
   dplyr::select(-CAR_AGE, -INCOME, -HOME_VAL)
 
-EHExplore_Interactions_Scatterplots(dfM1, "TARGET_AMT", "YOJ_NA")
+#EHExplore_Interactions_Scatterplots(dfM1, "TARGET_AMT", "YOJ_NA")
 
 ```
 
@@ -133,11 +133,17 @@ EHExplore_Interactions_Scatterplots(dfM1, "TARGET_AMT", "YOJ_NA")
 ```
 ```{r}
 
-#1. Base - outliers and nonormal distributionand heteroskedastic
+#1. Base - outliers and nonormal distributio nand heteroskedastic
 
 dfc7 <- na.omit(dfc5)
 aa <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
 hist(aa$residuals)
+
+dfc7a <- EHPrepare_MissingValues_Imputation(dfc5, "TARGET_AMT")
+aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
+hist(aq$residuals)
+```
+```{r}
 
 #2. Remove main outliers - just resuts in new outliers and distribution is the same and still heteroskedastic
 
