@@ -146,7 +146,14 @@ dfc7 <- complete(mice1,1)
 #1. Base - outliers and nonormal distributio nand heteroskedastic
 
 aa <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
-hist(aa[1]$residuals)
+hist(aa[[1]]$residuals)
+
+vv <- EHModel_Regression_Standard_Iterations(dfc7, "TARGET_AMT")
+```
+
+```{r}
+# same thing with mean imputation instead
+
 
 dfc7a <- EHPrepare_MissingValues_Imputation(dfc51, "TARGET_AMT")
 aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
