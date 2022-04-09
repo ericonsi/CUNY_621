@@ -133,17 +133,20 @@ dfM1 <- dfc6 %>%
 ```
 ```{r}
 
-#1. Base - outliers and nonormal distributio nand heteroskedastic
+#Missing
 library(mice)
 
 dfc51 <- dfc5 %>%
   mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
 
-mice1 <- mice(dfc51,m=50,seed=2)
+mice1 <- mice(dfc51,m=5,seed=2)
 dfc7 <- complete(mice1,1)
+```
+```{r}
+#1. Base - outliers and nonormal distributio nand heteroskedastic
 
 aa <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
-hist(aa$residuals)
+hist(aa[1]$residuals)
 
 dfc7a <- EHPrepare_MissingValues_Imputation(dfc51, "TARGET_AMT")
 aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
