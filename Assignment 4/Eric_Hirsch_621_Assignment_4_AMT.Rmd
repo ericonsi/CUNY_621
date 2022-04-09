@@ -134,12 +134,18 @@ dfM1 <- dfc6 %>%
 ```{r}
 
 #1. Base - outliers and nonormal distributio nand heteroskedastic
+library(mice)
 
-dfc7 <- na.omit(dfc5)
+dfc51 <- dfc5 %>%
+  mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
+
+mice1 <- mice(dfc51,m=50,seed=2)
+dfc7 <- complete(mice1,1)
+
 aa <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
 hist(aa$residuals)
 
-dfc7a <- EHPrepare_MissingValues_Imputation(dfc5, "TARGET_AMT")
+dfc7a <- EHPrepare_MissingValues_Imputation(dfc51, "TARGET_AMT")
 aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
 hist(aq$residuals)
 ```
@@ -153,7 +159,7 @@ dfc71 <- dfc7 %>%
 bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT")
 hist(bb$residuals)
 
-#3. Log of y - still nonormal (but closer to normal) with outliers, but now homoskedatsic
+#3. Log of y - still nonormal (but closer to normal) with outliers, but not homoskedatsic
 
 dfc72 <- dfc7
 dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT)
@@ -192,49 +198,6 @@ uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
 print(hist(dfc74$TARGET_AMT))
 print(hist(zz$residuals))
 ```
-```{r}
-
-df <- dfc73
-y <- "TARGET_AMT"
-
-
-  library(caTools)
-  library(Metrics)
-  
-  par(mfcol=c(2,2))
-  fla <- substitute(n ~ ., list(n = as.name(y)))
-  
-    split <- sample.split(df, SplitRatio = .8)
-    split
-    
-    train_reg <- subset(df, split == "TRUE")
-    test_reg <- subset(df, split == "FALSE")
-    mod_4 <- lm(fla, train_reg)
-    
-library(MASS)
-    library(dplyr)
-    
-  step3 <- stepAIC(mod_4, trace=FALSE)
-  print(summary(step3))
-
-
-    pred_linreg <- predict(step3,test_reg)
-    
-    Y_test<- test_reg[,y]
-    dfTest <- cbind(test_reg, pred_linreg)
-    
-    dfTest <- dfTest %>% 
-    dplyr::select(-TARGET_AMT)
-    
-    q <- lm(TARGET_AMT ~ ., test_reg)
-    print(summary(q))
-
-    mean_squared_error <- mse(test_reg[, y],pred_linreg)
-    Adj_R2 <- 1-(mean_squared_error/var(Y_test))
-    print(paste("Test Set adj R^2: ", Adj_R2))
-  
-```
-
 
 ```{r}
 EHModel_Regression_Robust(zz$model, "TARGET_AMT")
@@ -306,7 +269,7 @@ hist(w$residuals)
 ```{r}
 
 
-df5b <- df5 %>%
+df5b <- dfc5 %>%
   dplyr::select(-CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Home.Maker, -JOB_Doctor, -HOMEKIDS, -AGE, -YOJ, -OLDCLAIM, -EDUCATION_.High.School, -JOB_Clerical, -JOB_Student, -JOB_z_Blue.Collar, -RED_CAR_no)
 
 df5c <- df5b %>%
