@@ -197,9 +197,21 @@ print(hist(dfc73$TARGET_AMT))
 hist(zz[[1]]$residuals)
 
 ```
+
+
 ```{r}
-xd <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
-xd <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
+aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
+aa2 <- EHModel_Regression_Robust_Iterations(aa[[1]]$model, "TARGET_AMT")
+
+```
+```{r}
+aa3 <- EHModel_Regression_Standard_Iterations(cc[[1]]$model, "TARGET_AMT")
+aa4 <- EHModel_Regression_Robust_Iterations(cc[[1]]$model, "TARGET_AMT")
+```
+
+```{r}
+xd5 <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
+xd6 <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
 
 ```
 
@@ -230,13 +242,13 @@ EHModel_Regression_Robust(zz$model, "TARGET_AMT")
 
 #robust regression using log model
 
-robust1 <- rlm(TARGET_AMT ~ ., data=zz$model)
-robust2 <- rlm(TARGET_AMT ~ ., data=aa$model)
-robust3 <- rlm(TARGET_AMT ~ ., data=cc$model)
+robust1 <- rlm(TARGET_AMT ~ ., data=zz[[1]]$model)
+robust2 <- rlm(TARGET_AMT ~ ., data=aa[[1]]$model)
+robust3 <- rlm(TARGET_AMT ~ ., data=cc[[1]]$model)
 
-ols1 <- lm(TARGET_AMT ~ ., data=zz$model)
-ols2 <- lm(TARGET_AMT~., data=aa$model )
-ols3 <- lm(TARGET_AMT~., data=cc$model )
+ols1 <- lm(TARGET_AMT ~ ., data=zz[[1]]$model)
+ols2 <- lm(TARGET_AMT~., data=aa[[1]]$model )
+ols3 <- lm(TARGET_AMT~., data=cc[[1]]$model )
 
 
 summary(robust1)
