@@ -198,6 +198,20 @@ hist(zz[[1]]$residuals)
 
 ```
 
+```{r}
+
+qwe <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT")
+qwr <- EHModel_Regression_Robust(dfc73, "TARGET_AMT")
+
+hist(qwe[[1]]$residuals)
+hist(qwr[[4]])
+
+sd(qwr[[4]])
+sd(qwe[[1]]$residuals)
+
+```
+
+
 
 ```{r}
 aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
