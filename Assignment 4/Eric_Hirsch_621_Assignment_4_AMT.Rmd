@@ -192,6 +192,48 @@ uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
 print(hist(dfc74$TARGET_AMT))
 print(hist(zz$residuals))
 ```
+```{r}
+
+df <- dfc73
+y <- "TARGET_AMT"
+
+
+  library(caTools)
+  library(Metrics)
+  
+  par(mfcol=c(2,2))
+  fla <- substitute(n ~ ., list(n = as.name(y)))
+  
+    split <- sample.split(df, SplitRatio = .8)
+    split
+    
+    train_reg <- subset(df, split == "TRUE")
+    test_reg <- subset(df, split == "FALSE")
+    mod_4 <- lm(fla, train_reg)
+    
+library(MASS)
+    library(dplyr)
+    
+  step3 <- stepAIC(mod_4, trace=FALSE)
+  print(summary(step3))
+
+
+    pred_linreg <- predict(step3,test_reg)
+    
+    Y_test<- test_reg[,y]
+    dfTest <- cbind(test_reg, pred_linreg)
+    
+    dfTest <- dfTest %>% 
+    dplyr::select(-TARGET_AMT)
+    
+    q <- lm(TARGET_AMT ~ ., test_reg)
+    print(summary(q))
+
+    mean_squared_error <- mse(test_reg[, y],pred_linreg)
+    Adj_R2 <- 1-(mean_squared_error/var(Y_test))
+    print(paste("Test Set adj R^2: ", Adj_R2))
+  
+```
 
 
 ```{r}
