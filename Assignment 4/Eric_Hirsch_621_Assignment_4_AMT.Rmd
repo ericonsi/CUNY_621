@@ -195,7 +195,7 @@ print(hist(zz$residuals))
 
 
 ```{r}
-EHModel_Regression_Robust(dfc73, "TARGET_AMT")
+EHModel_Regression_Robust(zz$model, "TARGET_AMT")
 
 ```
 
