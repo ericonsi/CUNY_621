@@ -23,6 +23,7 @@ library(ggsci)
 library(caret)
 library(pROC)
 library(car)
+library(Metrics)
 ```
 ```{r}
 
@@ -218,18 +219,18 @@ qwr[[3]]
 
 
 ```{r}
-aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
-aa2 <- EHModel_Regression_Robust_Iterations(aa[[1]]$model, "TARGET_AMT")
+#aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
+#aa2 <- EHModel_Regression_Robust_Iterations(aa[[1]]$model, "TARGET_AMT")
 
 ```
 ```{r}
-aa3 <- EHModel_Regression_Standard_Iterations(cc[[1]]$model, "TARGET_AMT")
-aa4 <- EHModel_Regression_Robust_Iterations(cc[[1]]$model, "TARGET_AMT")
+#aa3 <- EHModel_Regression_Standard_Iterations(cc[[1]]$model, "TARGET_AMT")
+#aa4 <- EHModel_Regression_Robust_Iterations(cc[[1]]$model, "TARGET_AMT")
 ```
 
 ```{r}
-xd5 <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
-xd6 <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
+#xd5 <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
+#xd6 <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
 
 ```
 
@@ -248,11 +249,52 @@ dfc74 <- dfc73 %>%
   
 uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
 print(hist(dfc74$TARGET_AMT))
-print(hist(zz$residuals))
+print(hist(uu$residuals))
 ```
 
 ```{r}
-EHModel_Regression_Robust(zz$model, "TARGET_AMT")
+#second try
+
+asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=101)
+
+xresidual <- asd[[1]]$residuals
+
+dfNew <- cbind(dfc7, xresidual)
+
+hist(asd[[1]]$residuals)
+
+dfNew2 <- dfNew %>%
+  dplyr::filter(abs(xresidual)<4000) %>%
+  dplyr::select(-xresidual)
+
+asd2 <- EHModel_Regression_StandardLM(dfNew2, "TARGET_AMT", xseed = 101)
+
+hist(asd2[[1]]$residuals)
+
+
+#outliers:
+
+dfNew_Out <- dfNew %>%
+  dplyr::filter(abs(xresidual)>4000)
+
+hist(dfNew_Out$xresidual)
+
+#EHSummarize_StandardPlots(dfNew_Out, "TARGET_AMT")
+
+dfNew_Int <- dfNew %>%
+  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
+  dplyr::select(-xresidual)
+
+#EHExplore_Interactions_Scatterplots(dfNew_Int, "TARGET_AMT", "resid_flag")
+
+boxplot(dfNew_Int$INCOME, dfNew_Int$resid_flag)
+
+mean(dfNew2$INCOME)
+mean(dfNew_Out$INCOME)
+```
+
+```{r}
+EHModel_Regression_Robust(zz[[1]]$model, "TARGET_AMT")
 
 ```
 
