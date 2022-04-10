@@ -9,8 +9,8 @@ output:
     toc_depth: 4
 ---
 
-```{r setup, include=FALSE, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning =  FALSE, message = FALSE)
 ```
 
 ```{r}
@@ -83,8 +83,8 @@ str(dfc5)
 ```{r}
 library(psych)
 
-dfc6 <- dfc5 %>%
-  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+dfc6_MissingFlags <- dfc5 %>%
+  mutate(YOJ_NA = ifelse(is.na(YOJ),1,0), INCOME_NA = ifelse(is.na(INCOME)|INCOME==0,1,0), CAR_AGE_NA = ifelse(is.na(CAR_AGE),1,0), HOME_VAL_NA = ifelse(is.na(HOME_VAL)|HOME_VAL==0,1,0))
 
 #a <- EHSummarize_StandardPlots(dfc6, "TARGET_AMT", type="scatter")
 
@@ -249,7 +249,7 @@ dfc74 <- dfc73 %>%
   
 uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
 print(hist(dfc74$TARGET_AMT))
-print(hist(uu$residuals))
+print(hist(uu[[1]]$residuals))
 ```
 
 ```{r}
@@ -259,7 +259,13 @@ asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=1
 
 xresidual <- asd[[1]]$residuals
 
+
+dfMissing2 <- dfMissing %>%
+  dplyr::select(-TARGET_AMT)
+
 dfNew <- cbind(dfc7, xresidual)
+dfMissing2 <-cbind(dfMissing2, xresidual)
+  
 
 hist(asd[[1]]$residuals)
 
@@ -285,9 +291,24 @@ dfNew_Int <- dfNew %>%
   dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
   dplyr::select(-xresidual)
 
-#EHExplore_Interactions_Scatterplots(dfNew_Int, "TARGET_AMT", "resid_flag")
+dfMissing3 <- dfMissing2 %>%
+  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
+  dplyr::select(-xresidual)
 
-boxplot(dfNew_Int$INCOME, dfNew_Int$resid_flag)
+#wq <- EHExplore_Interactions_Scatterplots(dfNew_Int, "TARGET_AMT", "resid_flag")
+#grid.arrange(grobs = wq[c(1:12)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(13:24)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(25:36)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(37:39)], ncol=3, nrow=1)
+
+summary(dfNew2)
+str(dfNew2)
+
+we <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNew_Int, "resid_flag")
+grid.arrange(grobs = we[c(1,6,7,9,22,35)], ncol=3, nrow=2)
+
+EHExplore_TwoCategoricalColumns_Barcharts(dfMissing3, "resid_flag")
+
 
 mean(dfNew2$INCOME)
 mean(dfNew_Out$INCOME)
@@ -334,80 +355,11 @@ summary(robust3)$sigma
 
 ```
 
-```{r}
-
-dfc9 <- na.omit(dfc5)
-#dfc9$TARGET_AMT = log(dfc9$TARGET_AMT)
-
-robust <- rlm(TARGET_AMT ~ HOMEKIDS + TRAVTIME + MVR_PTS + CAR_AGE + CAR_TYPE_Pickup + CAR_TYPE_Van + RED_CAR_no + JOB_ + SEX_z_F+JOB_Lawyer + JOB_Manager + EDUCATION_.High.School+EDUCATION_Bachelors + EDUCATION_z_High.School, data=dfc9)
-
-ols <- lm(TARGET_AMT ~ HOMEKIDS + TRAVTIME + MVR_PTS + CAR_AGE + CAR_TYPE_Pickup + CAR_TYPE_Van + RED_CAR_no + JOB_ + SEX_z_F+JOB_Lawyer + JOB_Manager + EDUCATION_.High.School+EDUCATION_Bachelors + EDUCATION_z_High.School, data=dfc9)
-
-#find residual standard error of ols model
-summary(ols)$sigma
-
-#find residual standard error of robust model
-summary(robust)$sigma
-
-#Lower is better
-
-```
-
-
-```{r}
-library(MASS)
-w <- EHModel_Regression_StandardLM(dfc9, "TARGET_AMT")
-hist(w$residuals)
-```
-
-```{r}
-
-
-df5b <- dfc5 %>%
-  dplyr::select(-CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Home.Maker, -JOB_Doctor, -HOMEKIDS, -AGE, -YOJ, -OLDCLAIM, -EDUCATION_.High.School, -JOB_Clerical, -JOB_Student, -JOB_z_Blue.Collar, -RED_CAR_no)
-
-df5c <- df5b %>%
-  dplyr::select(-CAR_TYPE_Van, -MVR_PTS, -MSTATUS_Yes, -EDUCATION_z_High.School)
-
-#df5d <- df5c %>%
-#  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
-
-EHModel_Regression_Logistic(df5c, "TARGET_FLAG", splitRatio = 1, xseed = 10)
-
-  m1 <- glm(TARGET_FLAG ~ .,
-                        data = df5c,
-                        family = "binomial")
-  #print(m1)
-  plot(m1)
-  mmps(m1)
-
-```
-
-
-```{r}
-
-EHModel_Regression_Logistic_Iterations(df5c, "TARGET_FLAG")
-
-```
-
-
-```{r}
-
-
-df6 <- df5 %>%
-  dplyr::select(TARGET_FLAG, HOMEKIDS, OLDCLAIM, CLM_FREQ, MVR_PTS, PARENT1_Yes, MSTATUS_Yes, CAR_TYPE_z_SUV, REVOKED_Yes, URBANICITY_z_Highly.Rural..Rural)
-
-EHModel_Regression_Logistic(df6, "TARGET_FLAG")
-
-```
-
-
 
 ### 2. Data Preparation
 
 #### A. Interaction terms
-
-As stated before, the dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low industrialization and very high industrialization, which may affect the slope of other variables.  We create some dummy variables and look for interactions.  These are the dummy variables we've chosen, based on the histograms above:
+  These are the dummy variables we've chosen, based on the histograms above:
 
     TaxOver600
     radOver10
@@ -422,39 +374,23 @@ The following are just some of the possible interactions we discover affecting t
 
 ```{r}
 
-dfInt <- df %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+#dfInt <- df %>%
+#    mutate(TaxOver600 = ifelse(tax>=600,1,0)) 
 
-dfEval <- dfEval %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+#dfEval <- dfEval %>%
+    #mutate(TaxOver600 = ifelse(tax>=600,1,0))
 
-a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
-b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
-c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
-d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
-e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
+#a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
+#b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
 
-x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
 
-grid.arrange(grobs=x, ncol=3, nrow=4)
+#x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
+
+#grid.arrange(grobs=x, ncol=3, nrow=4)
 
 ```
 
-From these plots, we might draw a number of conclusions.  First, in the most highly industrialized areas the crime rate appears to be high no matter the other factors. Zone 0 areas behave differently from zone 1 areas. In the few schools where the pt ratio is very small, crime rates are high, even though in general crime rates increase as ptratio increases.  There may be other conclusions we can draw as well.
+From these plots, we might draw a number of conclusions.  First, 
 
 These interactions may or may not prove useful.  We don't want to overfit the data, so it may be enough to simply include the dummy variables.
 
@@ -477,301 +413,22 @@ We begin with the base model (all original variables from the original dataset).
 
 
 ```{r}
-EHModel_Regression_Logistic(df, "target", splitRatio = 1)
+#EHModel_Regression_Logistic(df, "target", splitRatio = 1)
 
 ```
 
 In the base model, only 4 of the 12 predictors are not significant. AIC is 218. Through backward elimination we remove rm, lstat, chas and indus and arrive at a model with an AIC of 215.
 
-Now we split the dataset 80/20 and perform 100 training iterations to test model predictive power.  
-
-```{r include=FALSE}
-
-dfx <- df %>%
-  dplyr::select(-rm, -lstat, -chas, -indus)
-
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfx, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
-
-The base model alone is an excellent predictor of crime rate. Accuracy is 91%. AIC of the smaller model is 171 (AIC will drop with fewer observations.)
-
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 91% accuracy and an AIC of 215 for the full model.*__
-
-#### B. Enhanced Model with Dummies and Transformations
-
-Now we try a model with all of our dummy variables from above and as well as our interactions:
-
-```{r}
-
-dfInt2 <- dfInt %>%
-  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
-
-dfEval <- dfEval %>%
-  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
-```
-
-```{r}
-
-dfc8 <- dfc7 %>%
-  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
-  
-dfc8$TARGET_AMT <- log(dfc8$TARGET_AMT)
-z <- EHModel_Regression_StandardLM(dfc8, "TARGET_AMT")
-hist(z$residuals)
-```
-
-
-```{r}
-
-df7b <- df7 %>%
-  dplyr::select(-JOB_Home.Maker, -CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Doctor, -JOB_Clerical, -tif_log, -mvr_pts_log, -carage_log, -clm_freq_log, -CLM_FREQ, -bluebook_log, -yojSquared)
-
-df7c <- df7b %>%
-  dplyr::select(-RED_CAR_no, -YOJ, -JOB_z_Blue.Collar, -EDUCATION_.High.School, -kidsdriv_log, -MVR_PTS)
-
-df7d <- df7c %>%
-  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
-
-df7e <- df7d %>%
-  dplyr::select(-REVOKED_Yes, -JOB_Student, -income_log, -ageSquared, -AGE, -CAR_AGE)
-
-
-df7e <- df7d %>%
-  dplyr::select(-REVOKED_Yes, -JOB_Student, -income_log, -ageSquared, -AGE, -CAR_AGE, -CAR_TYPE_Van)
-
-df7f <- df7e %>%
-  dplyr::select(-homekids_log, -HOMEKIDS)
-
-EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
-
-```
-
-```{r}
-
-#EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", numOfIterations = 200)
-EHModel_Regression_Logistic(df7f, "TARGET_FLAG")
-
-```
-
-
-```{r}
-
-df8 <- df7 %>%
-  dplyr::select(TARGET_FLAG, AGE, TRAVTIME, PARENT1_Yes, CAR_TYPE_Pickup, CAR_TYPE_Sports.Car, CAR_TYPE_z_SUV, JOB_Lawyer, JOB_Manager, JOB_Student, AGE, ageSquared, URBANICITY_z_Highly.Rural..Rural, homeval_log, BLUEBOOK, TIF, SEX_z_F)
-
-EHModel_Regression_Logistic_Iterations(df8, "TARGET_FLAG")
-```
-
-
-
-```{r}
-
-df9 <- df8 %>%
-  dplyr::select(-BLUEBOOK, -TIF, -SEX_z_F)
-
-EHModel_Regression_Logistic_Iterations(df9, "TARGET_FLAG")
-
-```
-
-
-```{r include=FALSE}
-
-z <- EHModel_Regression_Logistic(dfInt2, "target", splitRatio = 1 )
-```
-
-Despite the larger number of variables, many of which are not significant, our AIC improves substantially to 178.  Through backward elimination we remove a number of variables and reduce the AIC to 163.  The new model can be seen below. Despite the fact that the tax variable does not seem significant, we leave it in, as taking it out increases AIC substantially.
-
-```{r}
-
-dfInt5 <- dfInt2 %>%
-  dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
-
-dfEval <- dfEval %>%
-    dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
-
-EHModel_Regression_Logistic(dfInt5, "target", splitRatio = 1)
-
-```
-
-
-We split the dataset 80/20 and perform 100 training iterations to test model predictive power.
-
-```{r include=FALSE}
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt5, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
-
-
-The model does a better job predicting outcomes (accuracy = .94) than the base model, and the AIC for the smaller model falls from 171 to 134. 
-
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 93% accuracy and an AIC of 163 for the full model.*__
+Now we split the dataset 80/20 and perform 100 training iterations to test model predictive power.
 
 #### C. Enhanced Model with Interaction Terms
 
-For this model we add interaction terms in addition to dummies and transformations.  We choose the following interactions as they seem the most promising:
-
-inter_z_rm = ZnOver0$*$rm\
-inter_age_indus = IndusOver16$*$age\
-inter_rad_lstat = radOver10$*$lstat\
-inter_pt_rad = ptOver14$*$rad
-
-```{r}
-
-dfInt6 <- dfInt2 %>%
-  mutate(inter_z_rm = ZnOver0*rm) %>%
-  mutate(inter_age_indus = IndusOver16*age) %>%
-  mutate(inter_rad_lstat = radOver10*lstat) %>% 
-  mutate(inter_pt_rad = ptOver14*rad) 
-
-```
-
-```{r}
-
-EHModel_Regression_Logistic(dfInt6, "target", splitRatio = 1)
-
-```
-None of the interaction terms are significant. AIC for the larger model climbs to 185, and the for the smaller it rises as well. Accuracy falls below 93%.  We will therefore reject the use of interaction terms.
-
-
-```{r include=FALSE}
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt6, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
 
 
 ### 4. Select Model
 
 We choose model B as the model with both best accuracy and lowest AIC. First we run some diagnostics on the model.
 
-```{r}
-
-  m1 <- glm(target ~ .,
-                        data = dfInt5,
-                        family = "binomial")
-  print(m1)
-  plot(m1)
-  mmps(m1)
-```
-
-Observations 338 and 280 appear to be outliers and possibly influential points (especially 280).  Since they are only two points, we will eliminate them to see their impact on accuracy and AIC:
-
-
-```{r include=FALSE}
-
-
-dfInt9 <- dfInt5 %>%
-  dplyr::filter(rownames(dfInt5) !="338" & rownames(dfInt5) !="280")
-
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt9, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
-
-This improves both accuracy and AIC and so (with the risk of overfitting) we accept the change.
-
-Our final model is as follows. Results may differ since there as an 80/20 split - however, what is shown below is typical.
-
-```{r}
-
-EHModel_Regression_Logistic(dfInt9, "target", xseed = 31)
-
-```
-
-The final step is to make predictions on the evaluation set:
-
-```{r}
-
-makePredictions <- function(m)
-{
-predictions <- as.data.frame(predict(m,newdata=dfEval, type="response"))
-write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
-}
-
-a <- makePredictions(m1)
-
-head(a)
-
-```
 ### 5. Conclusion
 
 We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
