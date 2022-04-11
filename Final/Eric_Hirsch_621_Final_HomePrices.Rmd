@@ -59,11 +59,17 @@ home_sales2 <- na.omit(home_sales1)
 
 library(tidytable)
 
-cols <- colnames(home_sales2)
+fact <- home_sales2 %>%
+  dplyr::select(is.factor|is.character)
 
-cols[names(cols) %in% c("Id", "Neighborhood") == FALSE]
+cols <- colnames(fact)
 
-cols <- cols[-c(1, 13)]   
+zz <- c("Id", "LotShape")
+
+cols <- cols[! cols %in% zz]
+
+
+#cols <- cols[-zz]   
 
 df3 <- home_sales2 %>%
   get_dummies.(cols,  drop_first = TRUE) %>%
@@ -71,7 +77,7 @@ df3 <- home_sales2 %>%
 
 df4 <- data.frame(df3) 
 
-#EHPrepare_CreateDummies(home_sales2)
+df5 <- EHPrepare_CreateDummies(home_sales2, include=c("LotShape", "Neighborhood"))
 
 
 ```
