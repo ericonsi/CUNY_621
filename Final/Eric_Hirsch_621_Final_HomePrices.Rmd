@@ -25,13 +25,13 @@ library(MASS)
 ```
 
 ```{r}
-#home_sales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_kaggle_test <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_submit <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+home_sales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
+home_kaggle_test <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
+home_submit <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
 
-home_sales <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-home_kaggle_test <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-home_submit <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+#home_sales <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
+#home_kaggle_test <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
+#home_submit <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
 ```
 
 ### Summary Statistics
@@ -76,29 +76,77 @@ dfSubmit5 <- EHPrepare_CreateDummies(home_test2)
 
 ```
 
+
 We Check if the dataset is missing columns from the evaluation dataset and if, so drop them from the original
 ```{r}
+g <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(df5, dfSubmit5, exclude=c("SalePrice"))
 
-library(janitor)
-compare_df_cols(dfTest_Final, dfFinal)
+df5R <- g[[1]]
+dfSubmit5R  <- g[[2]]
 
-dfFinal1 <- dfFinal %>%
-  dplyr::select(-LotConfig_CulDSac) %>%
-  dplyr::select(-LotConfig_FR2)  %>%
-  dplyr::select(-LotShape_IR3)
-  
 ```
 
 ```{r}
 
-df5 <- na.omit(df5)
+df6 <- na.omit(df5R)
 library(caTools)
 library(Metrics)
-df5$SalePrice <- log(df5$SalePrice)
-abc <- EHModel_Regression_StandardLM(df5, "SalePrice", splitRatio = 1)
+df6$SalePrice <- log(df6$SalePrice)
+
+#abc <- EHModel_Regression_StandardLM(df6, "SalePrice", splitRatio = 1, returnLM=TRUE)
+
+```
+Now we make predictions
+```{r}
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfSubmit5)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfSubmit5$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
+write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictions2.csv")
+}
+
+summary(abc$coefficients)
+
+
+makePredictions2(abc)
+
+```
+
+```{r}
+
+dfN <- df5R %>%
+    dplyr::select(SalePrice, starts_with('Neighborhood'))
+
+EHModel_Regression_StandardLM(dfN, "SalePrice", splitRatio = 1)
+
+
+```
+
+```{r}
+library(ggsci)
+qs <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfN, "SalePrice", yCategorical = FALSE)
+
+qs[[5]]
+
+#grid.arrange(grobs = qs[c(1:16)], ncol=4)
+#grid.arrange(grobs = qs[c(17:25)], ncol=4)
+
+
 ```
 
 
+```{r}
+EHSummarize_StandardPlots(abc$model, "SalePrice")
+
+
+```
 
 
 ```{r}
@@ -508,10 +556,10 @@ predictions$SalePrice <- exp(predictions$SalePrice)
 write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
 }
 
-summary(abc[[1]]$coefficients)
+summary(abc$coefficients)
 
 
-makePredictions2(abc[[1]]$coefficients)
+makePredictions2(abc)
 
 ```
 
