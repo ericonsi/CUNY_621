@@ -97,22 +97,22 @@ library(tidytable)
 
 cols <- c('PARENT1', 'MSTATUS', 'SEX', 'CAR_TYPE', 'RED_CAR', 'REVOKED', 'JOB', 'CAR_USE', 'EDUCATION', 'URBANICITY')
 
-df3 <- df2 %>%
-  get_dummies.(cols,  drop_first = TRUE) %>%
-  dplyr::select(-cols)
+df3 <- EHPrepare_CreateDummies(df2)
 
-df4 <- data.frame(df3) 
-
-df5 <- df4 %>%
- dplyr::filter(row_number() %% 10 == 1)  %>%
+df4 <- df3 %>%
+   dplyr::filter(row_number() %% 10 == 1)  %>%
   dplyr::select(-INDEX, -TARGET_AMT)
 
-
 ```
+
+#### D. Missing Values
+
 ```{r}
 library(MASS)
+EHSummarize_MissingValues(df4)
 
-df5 <- EHPrepare_MissingValues_Imputation(df5, "TARGET_FLAG")
+
+#df5 <- EHPrepare_MissingValues_Imputation(df5, "TARGET_FLAG")
 
 ```
 
