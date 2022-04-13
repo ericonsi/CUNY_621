@@ -77,7 +77,7 @@ Many of the variables are highly skewed, particularly TARGET_AMT. The level of o
 
 #### B. Multicollinearity
 
-The chart below shows multicollinearity for numerical variables only. There are no surprises here - older people tend not to have children at home, income and home value are related, etc.  Multicolinearity does not present offhand as a major issue.
+The chart below shows multicollinearity for numerical variables only. There are no surprises here - older people tend not to have children at home, income and home value are related, etc.  Multicollinearity does not present offhand as a major issue.
 
 ```{r}
 
@@ -89,6 +89,8 @@ EHExplore_Multicollinearity(df2Num, run_all=FALSE)
 ```
 
 #### C. Create Dummy Variables
+
+Next we create dummy variables from the character variables in the database.  
 
 ```{r}
 library(tidytable)
