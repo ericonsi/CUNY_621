@@ -60,7 +60,7 @@ str(df2)
 
 ```
 
-We examine distributions and boxplots.
+#### B. Distributions
 
 ```{r}
 library(psych)
@@ -75,7 +75,7 @@ grid.arrange(grobs=a[c(2:16)], ncol=4)
 Many of the variables are highly skewed, particularly TARGET_AMT. The level of outliers is very high.
 
 
-#### B. Multicollinearity
+#### C. Multicollinearity
 
 The chart below shows multicollinearity for numerical variables only. There are no surprises here - older people tend not to have children at home, income and home value are related, etc.  Multicollinearity does not present offhand as a major issue.
 
@@ -88,54 +88,115 @@ EHExplore_Multicollinearity(df2Num, run_all=FALSE)
 
 ```
 
-#### C. Create Dummy Variables
+### 2. Data Preparation
 
-Next we create dummy variables from the character variables in the database.  
+#### A. Create Dummy Variables
+
+We create dummy variables from the character variables in the database.  
 
 ```{r}
 library(tidytable)
-
-cols <- c('PARENT1', 'MSTATUS', 'SEX', 'CAR_TYPE', 'RED_CAR', 'REVOKED', 'JOB', 'CAR_USE', 'EDUCATION', 'URBANICITY')
 
 df3 <- EHPrepare_CreateDummies(df2)
 
 df4 <- df3 %>%
    dplyr::filter(row_number() %% 10 == 1)  %>%
-  dplyr::select(-INDEX, -TARGET_AMT)
+  dplyr::select(-INDEX)
 
 ```
 
-#### D. Missing Values
+#### B. Address Missing Values
+
+We consider the missing values. We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
 
 ```{r}
 library(MASS)
 EHSummarize_MissingValues(df4)
 
+df5 <- df4 %>%
+  mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
 
-#df5 <- EHPrepare_MissingValues_Imputation(df5, "TARGET_FLAG")
+df6 <- df5 %>%
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+
+library(mice)
+mice1 <- mice(df6,m=5,seed=2)
+df7 <- complete(mice1,1)
 
 ```
 
+####. C. Perform Transformations
+
+We perform log and other transformations, as well as add an interaction term, to the analysis.  These transformations are based on an examination of the distributions of the indepenent variables.  They include:
+
+ageSquared
+yojSquared
+income_log
+homeval_log
+travtime_log 
+bluebook_log 
+carage_log
+oldclaim_log
+clm_freq_log
+mvr_pts_log
+tif_log
+kidsdriv_log
+homekids_log
+inter (interaction term = KIDSDRIV*AGE
 
 ```{r}
 
-EHExplore_Multicollinearity(df5, run_all = TRUE)
-
+df8 <- df7 %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
 ```
-### Predicting TARGET_FLAG
+
+
+### 2. Predicting TARGET_FLAG
 
 ```{r}
 
-EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots()
+df8Flag <- df8 %>%
+  dplyr::select(-TARGET_AMT)
+
+dfNum_Flag <- df2Num %>%
+  dplyr::select(-TARGET_AMT, -INDEX)
 
 ```
 
+#### A. Explore relationships
+
+We can see from the boxplots run on the original numeric variables against TARGET_FLAG that the correlations are quite low. 
 
 ```{r}
 
-EHModel_Regression_Logistic(df5, "TARGET_FLAG")
+
+
+ty <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNum_Flag, "TARGET_FLAG")
+
+grid.arrange(grobs=ty[c(2:9)], ncol=2, nrow=4)
+grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
 
 ```
+#### B. 
+
+##### Create Model 1 - the base model with the original numeric variables.
+
+```{r}
+
+EHModel_Regression_Logistic_Iterations(dfNum_Flag, "TARGET_FLAG")
+
+```
+
+The base model has an accuracy of .748, an AIC of 5270 and an AUC of .716.
+
+##### Create Model 2 - the new model with all of the transformed and added variables.
+```{r}
+
+EHModel_Regression_Logistic_Iterations(df8Flag, "TARGET_FLAG")
+
+```
+
+The "kitchen sink" model offers a little improvement: Accuracy .752, AIC 654 and AUC .75.
 
 ```{r}
 
@@ -177,56 +238,6 @@ EHModel_Regression_Logistic(df6, "TARGET_FLAG")
 
 #### A. Interaction terms
 
-As stated before, the dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low industrialization and very high industrialization, which may affect the slope of other variables.  We create some dummy variables and look for interactions.  These are the dummy variables we've chosen, based on the histograms above:
-
-    TaxOver600
-    radOver10
-    ptOver14
-    lstatOver12
-    IndusOver16
-    ZnOver0
-    NoxOverPoint8
-    MedvBelow50
-
-The following are just some of the possible interactions we discover affecting the dataset:
-
-```{r}
-
-dfInt <- df %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
-
-dfEval <- dfEval %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
-
-a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
-b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
-c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
-d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
-e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
-
-x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
-
-grid.arrange(grobs=x, ncol=3, nrow=4)
-
-```
-
-From these plots, we might draw a number of conclusions.  First, in the most highly industrialized areas the crime rate appears to be high no matter the other factors. Zone 0 areas behave differently from zone 1 areas. In the few schools where the pt ratio is very small, crime rates are high, even though in general crime rates increase as ptratio increases.  There may be other conclusions we can draw as well.
-
-These interactions may or may not prove useful.  We don't want to overfit the data, so it may be enough to simply include the dummy variables.
 
 #### B. Transformations
 
