@@ -1,6 +1,6 @@
 ---
-title: "Eric_Hirsch_621_Assignment_3"
-subtitle: "Predicting Town Crime Rates" 
+title: "Eric_Hirsch_621_Assignment_4"
+subtitle: "Predicting Insurance Claims" 
 author: "Eric Hirsch"
 date: "4/7/2022"
 output:
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -33,15 +33,16 @@ df2 <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance_training_data.cs
 
 ```
 
+We examine records of car insurance customers to build two predictive models: one for whether the customer would have crashed, and second, the $ amount paid for the crash.  
 
-
+The main issue in the dataset are outliers.  Without transformation, the distribution of residuals is not normal, and there are two many influential points to create reliable models.
 
 ### 1. Data Exploration
 
 
 #### A. Summary Statistics
 
-We first examine the data. The dataset consists of 466 observations and 13 variables, all numeric.  Two are binary, including the target. There are no missing values.  The target appears to be relatively balanced (which makes sense, as it is an indicator of being above or below the median.)   
+We first examine the data. The dataset consists of 8161 observations and 26 variables (including two target variables, TARGET_FLAG and TARGET_AMT). 14 of the predictor variables are numeric. Approximately 27% of customers had an accident - the rest did not. TARGET_AMT appears to be highly skewed.
 
 ```{r}
 
@@ -59,22 +60,31 @@ str(df2)
 
 ```
 
+We examine distributions and boxplots.
+
 ```{r}
 library(psych)
+library(patchwork)
 
-a <- EHSummarize_StandardPlots(df2Crashed, "TARGET_AMT", type="scatter")
-a <- EHSummarize_StandardPlots(df2, "TARGET_FLAG", type="box")
+a <- EHSummarize_SingleColumn_Boxplots(df2)
+grid.arrange(grobs=a[c(2:16)], ncol=4)
+
+a <-EHSummarize_SingleColumn_Histograms(df2)
+grid.arrange(grobs=a[c(2:16)], ncol=4)
 ```
-
-What do you see? goes here
+Many of the variables are highly skewed, particularly TARGET_AMT. The level of outliers is very high.
 
 
 #### B. Multicollinearity
 
+The chart below shows multicollinearity for numerical variables only. There are no surprises here - older people tend not to have children at home, income and home value are related, etc.  Multicolinearity does not present offhand as a major issue.
 
 ```{r}
-#EHExplore_Multicollinearity(df2, run_all=FALSE)
 
+df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+EHExplore_Multicollinearity(df2Num, run_all=FALSE)
 
 ```
 
@@ -108,6 +118,13 @@ df5 <- EHPrepare_MissingValues_Imputation(df5, "TARGET_FLAG")
 ```{r}
 
 EHExplore_Multicollinearity(df5, run_all = TRUE)
+
+```
+### Predicting TARGET_FLAG
+
+```{r}
+
+EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots()
 
 ```
 
