@@ -161,6 +161,13 @@ df8Flag <- df8 %>%
 dfNum_Flag <- df2Num %>%
   dplyr::select(-TARGET_AMT, -INDEX)
 
+
+df8AMT <- df8 %>%
+  dplyr::select(-TARGET_FLAG)
+
+dfNum_Amt <- df2Num %>%
+  dplyr::select(-TARGET_FLAG, -INDEX)
+
 ```
 
 #### A. Explore relationships
@@ -243,11 +250,222 @@ We select model 3
 
 ```{r}
 
-dfNumAMT <- df2Num %>%
-  dplyr::select(-TARGET_FLAG, -INDEX)
-
-ws <- EHExplore_TwoContinuousColumns_Scatterplots(dfNumAMT, "TARGET_AMT")
+ws <- EHExplore_TwoContinuousColumns_Scatterplots(dfNum_AMT, "TARGET_AMT")
 grid.arrange(grobs=ws[c(2:14)], ncol=4)
+
+```
+
+```{r}
+#1. Base - outliers and non-normal distribution and heteroskedastic
+
+dfc7 <- df8AMT
+
+aa <- EHModel_Regression_StandardLM(dfNum_Amt, "TARGET_AMT")
+hist(aa[[1]]$residuals)
+
+
+```
+```{r}
+#xd <- EHModel_Regression_Robust_Iterations(dfc7, "TARGET_AMT")
+
+
+```
+
+
+```{r}
+# same thing with mean imputation instead
+
+
+dfc7a <- EHPrepare_MissingValues_Imputation(dfc51, "TARGET_AMT")
+aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
+hist(aq[[1]]$residuals)
+```
+```{r}
+
+#2. Remove main outliers - just resuts in new outliers and distribution is the same and still heteroskedastic
+
+dfc71 <- dfc7 %>%
+  dplyr::filter(rownames(dfc7) != 66, rownames(dfc7) != 26, rownames(dfc7) != 183, rownames(dfc7) != 570, rownames(dfc7) != 260, rownames(dfc7) != 147)
+
+bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT")
+hist(bb[[1]]$residuals)
+
+#3. Log of y - still nonormal (but closer to normal) with outliers, but not homoskedatsic
+
+dfc72 <- dfc7
+dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT)
+cc<- EHModel_Regression_StandardLM(dfc72, "TARGET_AMT")
+hist(cc[[1]]$residuals)
+
+```
+```{r}
+
+
+# Add log terms - residuals closer to normal but not (not skewed but heavy tailed), and outliers remain
+
+dfc73 <- dfc72 %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+
+dfc73 <- na.omit(dfc73)
+zz <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", splitRatio = 1)
+print(hist(dfc73$TARGET_AMT))
+hist(zz[[1]]$residuals)
+
+```
+
+```{r}
+
+qwe <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
+qwr <- EHModel_Regression_Robust(dfc7, "TARGET_AMT")
+
+hist(qwe[[1]]$residuals)
+hist(qwr[[1]]$residuals)
+hist(qwe[[4]])
+hist(qwr[[4]])
+
+qwe[[2]]
+qwr[[2]]
+qwe[[3]]
+qwr[[3]]
+
+```
+
+
+
+```{r}
+#aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
+#aa2 <- EHModel_Regression_Robust_Iterations(aa[[1]]$model, "TARGET_AMT")
+
+```
+```{r}
+#aa3 <- EHModel_Regression_Standard_Iterations(cc[[1]]$model, "TARGET_AMT")
+#aa4 <- EHModel_Regression_Robust_Iterations(cc[[1]]$model, "TARGET_AMT")
+```
+
+```{r}
+#xd5 <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
+#xd6 <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
+
+```
+
+
+```{r}
+
+# above plus massive outlier elimination - no progress
+
+
+#9.5 and 7.5 work
+
+dfc74 <- dfc73 %>%
+  dplyr::filter(TARGET_AMT<9 & TARGET_AMT>8)
+
+#xb <- lm(TARGET_AMT~., dfc74)
+  
+uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
+print(hist(dfc74$TARGET_AMT))
+print(hist(uu[[1]]$residuals))
+```
+
+```{r}
+#second try
+
+asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=101)
+
+xresidual <- asd[[1]]$residuals
+
+
+dfMissing2 <- dfMissing %>%
+  dplyr::select(-TARGET_AMT)
+
+dfNew <- cbind(dfc7, xresidual)
+dfMissing2 <-cbind(dfMissing2, xresidual)
+  
+
+hist(asd[[1]]$residuals)
+
+dfNew2 <- dfNew %>%
+  dplyr::filter(abs(xresidual)<4000) %>%
+  dplyr::select(-xresidual)
+
+asd2 <- EHModel_Regression_StandardLM(dfNew2, "TARGET_AMT", xseed = 101)
+
+hist(asd2[[1]]$residuals)
+
+
+#outliers:
+
+dfNew_Out <- dfNew %>%
+  dplyr::filter(abs(xresidual)>4000)
+
+hist(dfNew_Out$xresidual)
+
+#EHSummarize_StandardPlots(dfNew_Out, "TARGET_AMT")
+
+dfNew_Int <- dfNew %>%
+  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
+  dplyr::select(-xresidual)
+
+dfMissing3 <- dfMissing2 %>%
+  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
+  dplyr::select(-xresidual)
+
+#wq <- EHExplore_Interactions_Scatterplots(dfNew_Int, "TARGET_AMT", "resid_flag")
+#grid.arrange(grobs = wq[c(1:12)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(13:24)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(25:36)], ncol=3, nrow=4)
+#grid.arrange(grobs = wq[c(37:39)], ncol=3, nrow=1)
+
+summary(dfNew2)
+str(dfNew2)
+
+we <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNew_Int, "resid_flag")
+grid.arrange(grobs = we[c(1,6,7,9,22,35)], ncol=3, nrow=2)
+
+EHExplore_TwoCategoricalColumns_Barcharts(dfMissing3, "resid_flag")
+
+
+mean(dfNew2$INCOME)
+mean(dfNew_Out$INCOME)
+```
+
+```{r}
+EHModel_Regression_Robust(zz[[1]]$model, "TARGET_AMT")
+
+```
+
+```{r}
+
+#robust regression using log model
+
+robust1 <- rlm(TARGET_AMT ~ ., data=zz[[1]]$model)
+robust2 <- rlm(TARGET_AMT ~ ., data=aa[[1]]$model)
+robust3 <- rlm(TARGET_AMT ~ ., data=cc[[1]]$model)
+
+ols1 <- lm(TARGET_AMT ~ ., data=zz[[1]]$model)
+ols2 <- lm(TARGET_AMT~., data=aa[[1]]$model )
+ols3 <- lm(TARGET_AMT~., data=cc[[1]]$model )
+
+
+summary(robust1)
+
+#find residual standard error of ols model
+summary(ols1)$sigma
+
+#find residual standard error of robust model
+summary(robust1)$sigma
+
+summary(ols2)$sigma
+
+#find residual standard error of robust model
+summary(robust2)$sigma
+
+summary(ols3)$sigma
+
+#find residual standard error of robust model
+summary(robust3)$sigma
+
+#Lower is better
+
 
 ```
 
