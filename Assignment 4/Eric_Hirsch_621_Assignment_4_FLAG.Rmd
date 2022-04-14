@@ -151,7 +151,7 @@ df8 <- df7 %>%
 ```
 
 
-### 2. Predicting TARGET_FLAG
+### 2. Predict TARGET_FLAG
 
 ```{r}
 
@@ -165,7 +165,7 @@ dfNum_Flag <- df2Num %>%
 df8AMT <- df8 %>%
   dplyr::select(-TARGET_FLAG)
 
-dfNum_Amt <- df2Num %>%
+dfNum_AMT <- df2Num %>%
   dplyr::select(-TARGET_FLAG, -INDEX)
 
 ```
@@ -240,7 +240,7 @@ EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 
 This model has an accuracy of .755, an AIC of 597, and an AUC of .777.  This is the best model so far.
 
-### 4. Select model
+#### 4. Select model
 
 We select model 3
 
@@ -255,31 +255,21 @@ grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 ```
 
+#### B. Create models
+
 ```{r}
 #1. Base - outliers and non-normal distribution and heteroskedastic
 
-dfc7 <- df8AMT
+dfNum_AMT <- na.omit(dfNum_AMT)
 
-aa <- EHModel_Regression_StandardLM(dfNum_Amt, "TARGET_AMT")
-hist(aa[[1]]$residuals)
+dfc7 <- dfNum_AMT
+dfc7 
 
-
-```
-```{r}
-#xd <- EHModel_Regression_Robust_Iterations(dfc7, "TARGET_AMT")
-
+aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE)
+#hist(aa[[1]]$residuals)
 
 ```
 
-
-```{r}
-# same thing with mean imputation instead
-
-
-dfc7a <- EHPrepare_MissingValues_Imputation(dfc51, "TARGET_AMT")
-aq <- EHModel_Regression_StandardLM(dfc7a, "TARGET_AMT")
-hist(aq[[1]]$residuals)
-```
 ```{r}
 
 #2. Remove main outliers - just resuts in new outliers and distribution is the same and still heteroskedastic
@@ -287,15 +277,15 @@ hist(aq[[1]]$residuals)
 dfc71 <- dfc7 %>%
   dplyr::filter(rownames(dfc7) != 66, rownames(dfc7) != 26, rownames(dfc7) != 183, rownames(dfc7) != 570, rownames(dfc7) != 260, rownames(dfc7) != 147)
 
-bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT")
-hist(bb[[1]]$residuals)
+bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT", tests = FALSE)
+#hist(bb[[1]]$residuals)
 
 #3. Log of y - still nonormal (but closer to normal) with outliers, but not homoskedatsic
 
 dfc72 <- dfc7
-dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT)
-cc<- EHModel_Regression_StandardLM(dfc72, "TARGET_AMT")
-hist(cc[[1]]$residuals)
+dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT+1)
+cc<- EHModel_Regression_StandardLM(dfc72, "TARGET_AMT", tests = FALSE)
+#hist(cc[[1]]$residuals)
 
 ```
 ```{r}
@@ -307,18 +297,18 @@ dfc73 <- dfc72 %>%
   mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
 
 dfc73 <- na.omit(dfc73)
-zz <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", splitRatio = 1)
+zz <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", splitRatio = 1, tests = FALSE)
 print(hist(dfc73$TARGET_AMT))
-hist(zz[[1]]$residuals)
+#hist(zz[[1]]$residuals)
 
 ```
 
 ```{r}
 
-qwe <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT")
-qwr <- EHModel_Regression_Robust(dfc7, "TARGET_AMT")
+qwe <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", tests = FALSE)
+qwr <- EHModel_Regression_Robust(dfc73, "TARGET_AMT")
 
-hist(qwe[[1]]$residuals)
+hist(qwe$residuals)
 hist(qwr[[1]]$residuals)
 hist(qwe[[4]])
 hist(qwr[[4]])
