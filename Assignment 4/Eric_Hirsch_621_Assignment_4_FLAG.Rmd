@@ -244,10 +244,10 @@ We select model 3
 ```{r}
 
 dfNumAMT <- df2Num %>%
-  dplyr::select(-TARGET_FLAG)
+  dplyr::select(-TARGET_FLAG, -INDEX)
 
-EHExplore_Interactions_Scatterplots(dfNumAMT, "TARGET_AMT")
-
+ws <- EHExplore_TwoContinuousColumns_Scatterplots(dfNumAMT, "TARGET_AMT")
+grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 ```
 
