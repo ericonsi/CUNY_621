@@ -177,7 +177,8 @@ grid.arrange(grobs=ty[c(2:9)], ncol=2, nrow=4)
 grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
 
 ```
-#### B. 
+
+#### B. Create Models
 
 ##### Create Model 1 - the base model with the original numeric variables.
 
@@ -200,98 +201,7 @@ The "kitchen sink" model offers a little improvement: Accuracy .752, AIC 654 and
 
 ##### Create Model 3 - Use backward elmination to choose the best model:
 
-```{r}
-
-df9Flag <- df8Flag %>%
-  dplyr::select(-CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Home.Maker, -JOB_Doctor, -HOMEKIDS, -AGE, -YOJ, -OLDCLAIM, -EDUCATION_.High.School, -JOB_Clerical, -JOB_Student, -JOB_z_Blue.Collar, -RED_CAR_no, -CAR_TYPE_Van, -MVR_PTS, -MSTATUS_Yes, -EDUCATION_z_High.School)
-
-EHModel_Regression_Logistic(df9Flag, "TARGET_FLAG", splitRatio = 1, xseed=10)
-
-```
-
-
-```{r}
-
-
-df5b <- df5 %>%
-  dplyr::select(-CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Home.Maker, -JOB_Doctor, -HOMEKIDS, -AGE, -YOJ, -OLDCLAIM, -EDUCATION_.High.School, -JOB_Clerical, -JOB_Student, -JOB_z_Blue.Collar, -RED_CAR_no)
-
-df5c <- df5b %>%
-  dplyr::select(-CAR_TYPE_Van, -MVR_PTS, -MSTATUS_Yes, -EDUCATION_z_High.School)
-
-#df5d <- df5c %>%
-#  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
-
-EHModel_Regression_Logistic(df5c, "TARGET_FLAG", splitRatio = 1, xseed = 10)
-
-```
-
-
-```{r}
-
-EHModel_Regression_Logistic_Iterations(df5c, "TARGET_FLAG")
-
-```
-
-
-```{r}
-
-
-df6 <- df5 %>%
-  dplyr::select(TARGET_FLAG, HOMEKIDS, OLDCLAIM, CLM_FREQ, MVR_PTS, PARENT1_Yes, MSTATUS_Yes, CAR_TYPE_z_SUV, REVOKED_Yes, URBANICITY_z_Highly.Rural..Rural)
-
-EHModel_Regression_Logistic(df6, "TARGET_FLAG")
-
-```
-
-
-
-### 2. Data Preparation
-
-#### A. Interaction terms
-
-
-#### B. Transformations
-
-When the predictor variable is normally distributed but with different variance for the two values of y, we may try a quadratic function of x.  rm may be considered a reasonable candidate for this.
-
-For skewed distributions, we may include both x and log(x).  nox, age, dis and lstat may be candidates for this. 
-
-Therefore we add the following transformations:
-
-rmSquared, nox_log, age_log, dis_log, lstat_log
-
-
-### 3. Build Models
-
-#### A. Base Model
-
-We begin with the base model (all original variables from the original dataset).  
-
-
-```{r}
-EHModel_Regression_Logistic(df, "target", splitRatio = 1)
-
-```
-
-
-The base model alone is an excellent predictor of crime rate. Accuracy is 91%. AIC of the smaller model is 171 (AIC will drop with fewer observations.)
-
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 91% accuracy and an AIC of 215 for the full model.*__
-
-#### B. Enhanced Model with Dummies and Transformations
-
-Now we try a model with all of our dummy variables from above and as well as our interactions:
-
-```{r}
-
-df7 <- df5 %>%
-  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
-  
-
-EHModel_Regression_Logistic_Iterations(df7, "TARGET_FLAG")
-```
-
+We use backward elimination to achieve a better fit and lower AIC.
 
 ```{r}
 
@@ -321,8 +231,28 @@ EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
 EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 ```
 
+This model has an accuracy of .755, an AIC of 597, and an AUC of .777.  This is the best model so far.
+
 ### 4. Select model
-### 5. Conclusion
+
+We select model 3
+
+### 5. Predict TARGET_AMT
+
+#### A.Explore Relationships
+
+```{r}
+
+dfNumAMT <- df2Num %>%
+  dplyr::select(-TARGET_FLAG)
+
+EHExplore_Interactions_Scatterplots(dfNumAMT, "TARGET_AMT")
+
+
+```
+
+
+### 10. Conclusion
 
 We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
 
