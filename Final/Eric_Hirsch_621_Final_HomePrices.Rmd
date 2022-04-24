@@ -93,9 +93,46 @@ library(caTools)
 library(Metrics)
 df6$SalePrice <- log(df6$SalePrice)
 
+dfSmall <- df6 %>%
+  dplyr::select(SalePrice, OverallQual, OverallCond, YearBuilt, LotArea, GrLivArea, TotRmsAbvGrd)
+```
+
+```{r}
+abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
+
 #abc <- EHModel_Regression_StandardLM(df6, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 ```
+
+```{r}
+
+library(glmnet)
+## Loading required package: Matrix
+## Loaded glmnet 4.0-2
+# Prepare glmnet input as matrix of predictors and response var as vector
+varmtx <- model.matrix(SalePrice~.-1, data=dfSmall)
+response <- dfSmall$SalePrice
+# alpha=0 means ridge regression. 
+ridge <- glmnet(scale(varmtx), response, alpha=0)
+# Cross validation to find the optimal lambda penalization
+cv.ridge <- cv.glmnet(varmtx, response, alpha=0)
+lbs_fun <- function(fit, offset_x=1, ...) {
+  L <- length(fit$lambda)
+  x <- log(fit$lambda[L])+ offset_x
+  y <- fit$beta[, L]
+  labs <- names(y)
+  text(x, y, labels=labs, ...)
+}
+plot(ridge, xvar = "lambda", label=T)
+lbs_fun(ridge)
+abline(v=cv.ridge$lambda.min, col = "red", lty=2)
+abline(v=cv.ridge$lambda.1se, col="blue", lty=2)
+
+
+#y.pred <- as.matrix(cbind(const=1,dfSmall)) %*% coef(ridge)
+
+```
+
 Now we make predictions
 ```{r}
 
@@ -118,6 +155,33 @@ summary(abc$coefficients)
 makePredictions2(abc)
 
 ```
+
+```{r}
+library(glmnet)
+## Loading required package: Matrix
+## Loaded glmnet 4.0-2
+# Prepare glmnet input as matrix of predictors and response var as vector
+varmtx <- model.matrix(attacks~.-1, data=dat)
+response <- dat$attacks
+# alpha=0 means ridge regression. 
+ridge <- glmnet(scale(varmtx), response, alpha=0)
+# Cross validation to find the optimal lambda penalization
+cv.ridge <- cv.glmnet(varmtx, response, alpha=0)
+lbs_fun <- function(fit, offset_x=1, ...) {
+  L <- length(fit$lambda)
+  x <- log(fit$lambda[L])+ offset_x
+  y <- fit$beta[, L]
+  labs <- names(y)
+  text(x, y, labels=labs, ...)
+}
+plot(ridge, xvar = "lambda", label=T)
+lbs_fun(ridge)
+abline(v=cv.ridge$lambda.min, col = "red", lty=2)
+abline(v=cv.ridge$lambda.1se, col="blue", lty=2)
+
+
+```
+
 
 ```{r}
 
