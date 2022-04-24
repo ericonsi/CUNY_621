@@ -47,7 +47,7 @@ The main issue in the dataset are outliers.  Without transformation, the distrib
 
 #### A. Summary Statistics
 
-We first examine the data. The dataset consists of 8161 observations and 26 variables (including two target variables, TARGET_FLAG and TARGET_AMT). 14 of the predictor variables are numeric. Approximately 27% of customers had an accident - the rest did not. TARGET_AMT appears to be highly skewed.
+We first examine the data. The dataset consists of 8161 observations and 26 variables (including two target variables, TARGET_FLAG and TARGET_AMT). 14 of the predictor variables are numeric. Approximately 27% of customers had an accident - the rest did not. TARGET_AMT appears to be highly skewed.  There is a large degree of missing values.
 
 ```{r}
 
@@ -68,8 +68,10 @@ str(df2)
 
 #### B. Distributions
 
-##### 1. Boxplota
+We examine distributions of numeric variables through boxplots and histograms
 
+##### 1. Boxplots
+\
 
 ```{r}
 a <- EHSummarize_SingleColumn_Boxplots(df2)
@@ -78,12 +80,14 @@ grid.arrange(grobs=a[c(2:16)], ncol=4)
 ```
 
 ##### 2. Histograms
+\
 
 ```{r}
 
 a <-EHSummarize_SingleColumn_Histograms(df2)
 grid.arrange(grobs=a[c(2:16)], ncol=4)
 ```
+
 Many of the variables are highly skewed, particularly TARGET_AMT. The level of outliers is very high.
 
 
@@ -144,6 +148,7 @@ print(g[1])
 
 ```
 
+\
 
 ####. C. Perform Transformations
 
@@ -171,7 +176,7 @@ df8 <- df7 %>%
 ```
 
 
-### 2. Predict TARGET_FLAG
+### 3. Predict TARGET_FLAG
 
 ```{r}
 
@@ -210,7 +215,7 @@ grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
 
 #### B. Create Models
 
-##### Create Model 1 - the base model with the original numeric variables.
+##### Create Model 1 - a base model with the original numeric variables.
 
 ```{r}
 
@@ -227,7 +232,7 @@ Most of the predictors are significant.  This may in part be due to the fact tha
 
 We run the model 100 times at a 80/20 split.  The base model has an accuracy of .748, an AIC of 5266 and an AUC of .716.
 
-##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.
+##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.
 
 ```{r}
 
@@ -280,7 +285,7 @@ EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
 EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 ```
 
-The refined model improves AIC dramatically to 777.
+The refined model has an AIC of 7587.  This is not an improvment. 
 
 We run the model 100 times at a 80/20 split.  The refined model has an accuracy of .77, an AIC of 601 and an AUC of .78.  Despite lower AIC, this model does not predict the data as well.
 
@@ -300,7 +305,7 @@ knitr::kable(tab)
 
 Despite the apparent superior predictability of the second model, we choose the third. This model has a lower AIC and is more interpretable and coherent than the second model.  
 
-### 5. Predict TARGET_AMT
+### 4. Predict TARGET_AMT
 
 #### A.Explore Relationships
 
@@ -327,7 +332,7 @@ hist(aa$residuals)
 
 The base model shows a number of issues with the residuals including heteroskedastcity and particularly non-normal residuals.  We cannot use this model without some transformation.
 
-##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.  We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
+##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.  We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
 
 
 ```{r}
@@ -402,7 +407,7 @@ knitr::kable(tab)
 
 It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. In addition, the robust model clearly outperforms the standard model.  We therefore choose the robust refined model.
 
-### 10. Conclusion
+### 5. Conclusion
 
 We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
 
