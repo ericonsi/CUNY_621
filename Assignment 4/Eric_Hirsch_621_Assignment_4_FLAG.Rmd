@@ -338,7 +338,7 @@ We use stepAIC to choose the best model. The model retains very few predictor va
 
 dfNum_AMT <- na.omit(dfNum_AMT)
 
-EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
+x <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
 
 ```
 
