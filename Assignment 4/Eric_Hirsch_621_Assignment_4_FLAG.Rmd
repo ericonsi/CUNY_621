@@ -310,8 +310,13 @@ knitr::kable(tab)
 Despite the apparent superior predictability of the second model, we choose the third. This model has a lower AIC and is more interpretable and coherent than the second model.  
 
 ### 4. Predict TARGET_AMT
+\
+
+Now we predict the target amount for those customers who have had an accident.
 
 #### A.Explore Relationships
+
+We look at scatterplots of numeric variables: 
 
 ```{r}
 
@@ -320,37 +325,42 @@ grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 ```
 
+We can see that correlations are quite low.
+
 #### B. Create models
 
 ##### Create Model 1 - the base model with the original numeric variables.
+
+We use stepAIC to choose the best model. The model retains very few predictor variables.
 
 ```{r}
 #1. Base - outliers and non-normal distribution and heteroskedastic
 
 dfNum_AMT <- na.omit(dfNum_AMT)
 
-aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
-hist(aa$residuals)
+EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
 
 ```
 
 The base model shows a number of issues with the residuals including heteroskedastcity and particularly non-normal residuals.  We cannot use this model without some transformation.
 
-##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.  We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
+##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.  
+
+We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
 
 
 ```{r}
 
 df8AMT <- na.omit(df8AMT)
+df9AMT <- df8AMT
 
-df8AMT$TARGET_AMT = log(df8AMT$TARGET_AMT+1)
-zz <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio = 1, xseed=10, tests = FALSE)
-print(hist(df8AMT$TARGET_AMT))
+df9AMT$TARGET_AMT = log(df9AMT$TARGET_AMT+1)
+zz <- EHModel_Regression_StandardLM(df9AMT, "TARGET_AMT", splitRatio = 1, xseed=10, tests = FALSE)
 hist(zz$residuals)
 
 ```
 
-The adjusted-R-Squared is very low, despite the number of significant variables and significance overall. The distribution of the residuals imporves but the tails are still an issue.  There still appear to be a large number of outliers.
+The adjusted-R-Squared is very low, despite the number of significant variables and significance overall. The distribution of the residuals improves but the tails are still an issue.  There still appear to be a large number of outliers.
 
 
 ##### Create Model 3 - a model using robust regression.
@@ -363,8 +373,8 @@ qwe <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", splitRatio=1, xsee
 
 qwr <- EHModel_Regression_Robust(dfNum_AMT, "TARGET_AMT")
 
-qwx <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
-qwy <- EHModel_Regression_Robust(df8AMT, "TARGET_AMT")
+qwx <- EHModel_Regression_StandardLM(df9AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
+qwy <- EHModel_Regression_Robust(df9AMT, "TARGET_AMT")
 
 
 ```
@@ -373,7 +383,7 @@ qwy <- EHModel_Regression_Robust(df8AMT, "TARGET_AMT")
 The following table summarizes the RSE and RSME when using robust regression on the base and refined models:
 
 
-```{r}
+```{r, include = FALSE}
 
 robust1 <- rlm(TARGET_AMT ~ ., data=dfNum_AMT)
 robust2 <- rlm(TARGET_AMT ~ ., data=df8AMT)
@@ -400,7 +410,7 @@ summary(robust3)$sigma
 ```{r}
 
 
-tab <- matrix(c(7605, .80, .035, .239, 2334, .573), ncol=2, byrow=TRUE)
+tab <- matrix(c(7605, .80, .016, .026, 2334, .573), ncol=2, byrow=TRUE)
 colnames(tab) <- c('Base Model', 'Refined Model')
 rownames(tab) <- c('Standard - Sigma','Standard - Adj-R^2','Robust - Sigma')
 tab <- as.table(tab)
