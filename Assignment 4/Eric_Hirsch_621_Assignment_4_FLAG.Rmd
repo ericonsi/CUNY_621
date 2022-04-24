@@ -320,7 +320,7 @@ grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 dfNum_AMT <- na.omit(dfNum_AMT)
 
-aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE)
+aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
 hist(aa$residuals)
 
 ```
@@ -368,6 +368,8 @@ The following table summarizes the RSE and RSME when using robust regression on 
 
 robust1 <- rlm(TARGET_AMT ~ ., data=dfNum_AMT)
 robust2 <- rlm(TARGET_AMT ~ ., data=df8AMT)
+robust3 <- rlm(TARGET_AMT ~ ., data=qwx$model)
+
 
 ols1 <- lm(TARGET_AMT ~ ., data=qwe$model)
 ols2 <- lm(TARGET_AMT~., data=qwx$model)
@@ -382,13 +384,14 @@ summary(ols2)$sigma
 
 #find residual standard error of robust model
 summary(robust2)$sigma
+summary(robust3)$sigma
 ```
 
 
 ```{r}
 
 
-tab <- matrix(c(4584, .86, .035, .239, 221, .807), ncol=2, byrow=TRUE)
+tab <- matrix(c(7605, .80, .035, .239, 2334, .573), ncol=2, byrow=TRUE)
 colnames(tab) <- c('Base Model', 'Refined Model')
 rownames(tab) <- c('Standard - Sigma','Standard - Adj-R^2','Robust - Sigma')
 tab <- as.table(tab)
@@ -397,7 +400,7 @@ knitr::kable(tab)
 
 ```
 
-It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. While the robust model outperforms the base standard model by a wide margin, the improvement in the 
+It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. In addition, the robust model clearly outperforms the standard model.  We therefore choose the robust refined model.
 
 ### 10. Conclusion
 
