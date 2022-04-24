@@ -23,6 +23,11 @@ library(ggsci)
 library(caret)
 library(pROC)
 library(car)
+library(psych)
+library(patchwork)
+library(tidytable)
+library(MASS)
+library(mice)
 ```
 ```{r}
 
@@ -67,9 +72,6 @@ str(df2)
 
 
 ```{r}
-library(psych)
-library(patchwork)
-
 a <- EHSummarize_SingleColumn_Boxplots(df2)
 grid.arrange(grobs=a[c(2:16)], ncol=4)
 
@@ -105,7 +107,7 @@ EHExplore_Multicollinearity(df2Num, run_all=FALSE)
 We create dummy variables from the character variables in the database.  
 
 ```{r}
-library(tidytable)
+
 
 df3 <- EHPrepare_CreateDummies(df2)
 
@@ -122,7 +124,7 @@ We consider the missing values. Over 20% of the records have missing values.
 We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
 
 ```{r, include=FALSE}
-library(MASS)
+
 g <- EHSummarize_MissingValues(df4)
 
 df5 <- df4 %>%
@@ -131,7 +133,6 @@ df5 <- df4 %>%
 df6 <- df5 %>%
   mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
 
-library(mice)
 mice1 <- mice(df6,m=5,seed=2)
 df7 <- complete(mice1,1)
 
@@ -334,7 +335,7 @@ The base model shows a number of issues with the residuals including heteroskeda
 df8AMT <- na.omit(df8AMT)
 
 df8AMT$TARGET_AMT = log(df8AMT$TARGET_AMT+1)
-zz <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio = 1, tests = FALSE)
+zz <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio = 1, xseed=10, tests = FALSE)
 print(hist(df8AMT$TARGET_AMT))
 hist(zz$residuals)
 
@@ -347,85 +348,29 @@ The adjusted-R-Squared is very low, despite the number of significant variables 
 
 If we remove a large number of outliers form the data our results improve dramatically. However, this must be true by definition as the variance will decrease when outliers are removed. A better way to discover the underlying pattern beneath the outliers (and to check that pattern against our second model) is robust regression.
 
-
-
 ```{r, include=FALSE}
 
-qwe <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", tests = FALSE)
-qwr <- EHModel_Regression_Robust(df8AMT, "TARGET_AMT")
+qwe <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
+
+qwr <- EHModel_Regression_Robust(dfNum_AMT, "TARGET_AMT")
+
+qwx <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
+qwy <- EHModel_Regression_Robust(df8AMT, "TARGET_AMT")
+
 
 ```
+#### 4. Select model
 
-```{r}
-
-hist(qwe$residuals)
-hist(qwr[[1]]$residuals)
-hist(qwe[[4]])
-hist(qwr[[4]])
-
-qwe[[2]]
-qwr[[2]]
-qwe[[3]]
-qwr[[3]]
-
-```
-
-
-
-```{r}
-#aa1 <- EHModel_Regression_Standard_Iterations(aa[[1]]$model, "TARGET_AMT")
-#aa2 <- EHModel_Regression_Robust_Iterations(aa[[1]]$model, "TARGET_AMT")
-
-```
-```{r}
-#aa3 <- EHModel_Regression_Standard_Iterations(cc[[1]]$model, "TARGET_AMT")
-#aa4 <- EHModel_Regression_Robust_Iterations(cc[[1]]$model, "TARGET_AMT")
-```
-
-```{r}
-#xd5 <- EHModel_Regression_Standard_Iterations(zz[[1]]$model, "TARGET_AMT")
-#xd6 <- EHModel_Regression_Robust_Iterations(zz[[1]]$model, "TARGET_AMT")
-
-```
+The following table summarizes the RSE and RSME when using robust regression on the base and refined models:
 
 
 ```{r}
 
-# above plus massive outlier elimination - no progress
+robust1 <- rlm(TARGET_AMT ~ ., data=dfNum_AMT)
+robust2 <- rlm(TARGET_AMT ~ ., data=df8AMT)
 
-
-#9.5 and 7.5 work
-
-dfc74 <- dfc73 %>%
-  dplyr::filter(TARGET_AMT<9 & TARGET_AMT>8)
-
-#xb <- lm(TARGET_AMT~., dfc74)
-  
-uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
-print(hist(dfc74$TARGET_AMT))
-#print(hist(uu[[1]]$residuals))
-```
-
-
-```{r}
-EHModel_Regression_Robust(zz[[1]]$model, "TARGET_AMT")
-
-```
-
-```{r}
-
-#robust regression using log model
-
-robust1 <- rlm(TARGET_AMT ~ ., data=zz[[1]]$model)
-robust2 <- rlm(TARGET_AMT ~ ., data=aa[[1]]$model)
-robust3 <- rlm(TARGET_AMT ~ ., data=cc[[1]]$model)
-
-ols1 <- lm(TARGET_AMT ~ ., data=zz[[1]]$model)
-ols2 <- lm(TARGET_AMT~., data=aa[[1]]$model )
-ols3 <- lm(TARGET_AMT~., data=cc[[1]]$model )
-
-
-summary(robust1)
+ols1 <- lm(TARGET_AMT ~ ., data=qwe$model)
+ols2 <- lm(TARGET_AMT~., data=qwx$model)
 
 #find residual standard error of ols model
 summary(ols1)$sigma
@@ -437,17 +382,22 @@ summary(ols2)$sigma
 
 #find residual standard error of robust model
 summary(robust2)$sigma
+```
 
-summary(ols3)$sigma
 
-#find residual standard error of robust model
-summary(robust3)$sigma
+```{r}
 
-#Lower is better
 
+tab <- matrix(c(4584, .86, .035, .239, 221, .807), ncol=2, byrow=TRUE)
+colnames(tab) <- c('Base Model', 'Refined Model')
+rownames(tab) <- c('Standard - Sigma','Standard - Adj-R^2','Robust - Sigma')
+tab <- as.table(tab)
+
+knitr::kable(tab)
 
 ```
 
+It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. While the robust model outperforms the base standard model by a wide margin, the improvement in the 
 
 ### 10. Conclusion
 
