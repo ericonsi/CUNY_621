@@ -13,7 +13,7 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 ```
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
@@ -35,7 +35,7 @@ df2 <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance_training_data.cs
 
 We examine records of car insurance customers to build two predictive models: one for whether the customer would have crashed, and second, the $ amount paid for the crash.  
 
-The main issue in the dataset are outliers.  Without transformation, the distribution of residuals is not normal, and there are two many influential points to create reliable models.
+The main issue in the dataset are outliers.  Without transformation, the distribution of residuals is not normal, and there are too many influential points to create reliable models.
 
 ### 1. Data Exploration
 
@@ -60,7 +60,11 @@ str(df2)
 
 ```
 
+
 #### B. Distributions
+
+##### 1. Boxplota
+
 
 ```{r}
 library(psych)
@@ -68,6 +72,12 @@ library(patchwork)
 
 a <- EHSummarize_SingleColumn_Boxplots(df2)
 grid.arrange(grobs=a[c(2:16)], ncol=4)
+
+```
+
+##### 2. Histograms
+
+```{r}
 
 a <-EHSummarize_SingleColumn_Histograms(df2)
 grid.arrange(grobs=a[c(2:16)], ncol=4)
@@ -100,18 +110,20 @@ library(tidytable)
 df3 <- EHPrepare_CreateDummies(df2)
 
 df4 <- df3 %>%
-   dplyr::filter(row_number() %% 10 == 1)  %>%
+   #dplyr::filter(row_number() %% 5 == 1)  %>%
   dplyr::select(-INDEX)
 
 ```
 
 #### B. Address Missing Values
 
-We consider the missing values. We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
+We consider the missing values. Over 20% of the records have missing values.
 
-```{r}
+We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
+
+```{r, include=FALSE}
 library(MASS)
-EHSummarize_MissingValues(df4)
+g <- EHSummarize_MissingValues(df4)
 
 df5 <- df4 %>%
   mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
@@ -125,24 +137,31 @@ df7 <- complete(mice1,1)
 
 ```
 
+```{r}
+
+print(g[1])
+
+```
+
+
 ####. C. Perform Transformations
 
 We perform log and other transformations, as well as add an interaction term, to the analysis.  These transformations are based on an examination of the distributions of the indepenent variables.  They include:
 
-ageSquared
-yojSquared
-income_log
-homeval_log
-travtime_log 
-bluebook_log 
-carage_log
-oldclaim_log
-clm_freq_log
-mvr_pts_log
-tif_log
-kidsdriv_log
-homekids_log
-inter (interaction term = KIDSDRIV*AGE
+ageSquared\
+yojSquared\
+income_log\
+homeval_log\
+travtime_log\
+bluebook_log\
+carage_log\
+oldclaim_log\
+clm_freq_log\
+mvr_pts_log\
+tif_log\
+kidsdriv_log\
+homekids_log\
+inter (interaction term = KIDSDRIV*AGE\
 
 ```{r}
 
@@ -185,26 +204,43 @@ grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
 
 ```
 
+
 #### B. Create Models
 
 ##### Create Model 1 - the base model with the original numeric variables.
 
 ```{r}
 
+EHModel_Regression_Logistic(dfNum_Flag, "TARGET_FLAG", splitRatio = 1, xseed=10)
+```
+
+```{r, include=FALSE}
+
 EHModel_Regression_Logistic_Iterations(dfNum_Flag, "TARGET_FLAG")
 
 ```
 
-The base model has an accuracy of .748, an AIC of 5270 and an AUC of .716.
+Most of the predictors are significant.  This may in part be due to the fact that there are over 8,000 predictions.  The model has an AIC of 6702. Almost 20% of the records are missing so the model is not necessarily reliable.
 
-##### Create Model 2 - a model with all of the transformed and added variables.
+We run the model 100 times at a 80/20 split.  The base model has an accuracy of .748, an AIC of 5266 and an AUC of .716.
+
+##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.
+
 ```{r}
+
+EHModel_Regression_Logistic(df8Flag, "TARGET_FLAG", splitRatio = 1, xseed =10)
+
+```
+
+```{r, include=FALSE}
 
 EHModel_Regression_Logistic_Iterations(df8Flag, "TARGET_FLAG")
 
 ```
 
-The "kitchen sink" model offers a little improvement: Accuracy .752, AIC 654 and AUC .75.
+In the "kitchen sink" model many of the predictors are not significant.  This model risks overprediction. AIC has increased to 7269.
+
+We run the model 100 times at a 80/20 split.  The kitchen sink model has an accuracy of .79, an AIC of 5723 and an AUC of .815.  Despite possible overprediction, this model offers significant improvement.
 
 ##### Create Model 3 - Use backward elmination to choose the best model:
 
@@ -228,21 +264,38 @@ df7e <- df7d %>%
 df7f <- df7e %>%
   dplyr::select(-homekids_log, -HOMEKIDS, -homeval_log, -INCOME_NA, -YOJ_NA, -CAR_AGE_NA, -JOB_, -EDUCATION_z_High.School, -EDUCATION_Masters, -JOB_Lawyer)
 
-EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
-
 ```
 
 ```{r}
 
+EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
+
+```
+
+```{r, include=FALSE}
 
 EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 ```
 
-This model has an accuracy of .755, an AIC of 597, and an AUC of .777.  This is the best model so far.
+The refined model improves AIC dramatically to 777.
+
+We run the model 100 times at a 80/20 split.  The refined model has an accuracy of .77, an AIC of 601 and an AUC of .78.  Despite lower AIC, this model does not predict the data as well.
 
 #### 4. Select model
 
-We select model 3
+Below is a table of results:
+```{r}
+
+tab <- matrix(c(.748, .79, .77, 5266, 5723, 601, .716, .815, .78), ncol=3, byrow=TRUE)
+colnames(tab) <- c('Base Model','Kitchen Sink Model','Refined Model')
+rownames(tab) <- c('Accuracy','AIC','AUC')
+tab <- as.table(tab)
+
+knitr::kable(tab)
+
+```
+
+Despite the apparent superior predictability of the second model, we choose the third. This model has a lower AIC and is more interpretable and coherent than the second model.  
 
 ### 5. Predict TARGET_AMT
 
@@ -257,22 +310,27 @@ grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 #### B. Create models
 
+##### Create Model 1 - the base model with the original numeric variables.
+
 ```{r}
 #1. Base - outliers and non-normal distribution and heteroskedastic
 
 dfNum_AMT <- na.omit(dfNum_AMT)
 
 dfc7 <- dfNum_AMT
-dfc7 
 
 aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE)
-#hist(aa[[1]]$residuals)
+hist(aa$residuals)
 
 ```
 
+The base model shows a number of issues with the residuals including heteroskedastcity and particularly non-normal residuals.  We cannot use this model without some transformation.
+
+##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.
+
 ```{r}
 
-#2. Remove main outliers - just resuts in new outliers and distribution is the same and still heteroskedastic
+#2. Remove main outliers - just results in new outliers and distribution is the same and still heteroskedastic
 
 dfc71 <- dfc7 %>%
   dplyr::filter(rownames(dfc7) != 66, rownames(dfc7) != 26, rownames(dfc7) != 183, rownames(dfc7) != 570, rownames(dfc7) != 260, rownames(dfc7) != 147)
@@ -353,15 +411,15 @@ dfc74 <- dfc73 %>%
   
 uu <- EHModel_Regression_StandardLM(dfc74, "TARGET_AMT")
 print(hist(dfc74$TARGET_AMT))
-print(hist(uu[[1]]$residuals))
+#print(hist(uu[[1]]$residuals))
 ```
 
 ```{r}
 #second try
 
-asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=101)
+asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=101, tests = FALSE)
 
-xresidual <- asd[[1]]$residuals
+xresidual <- asd$residuals
 
 
 dfMissing2 <- dfMissing %>%
@@ -371,15 +429,15 @@ dfNew <- cbind(dfc7, xresidual)
 dfMissing2 <-cbind(dfMissing2, xresidual)
   
 
-hist(asd[[1]]$residuals)
+#hist(asd[[1]]$residuals)
 
 dfNew2 <- dfNew %>%
   dplyr::filter(abs(xresidual)<4000) %>%
   dplyr::select(-xresidual)
 
-asd2 <- EHModel_Regression_StandardLM(dfNew2, "TARGET_AMT", xseed = 101)
+asd2 <- EHModel_Regression_StandardLM(dfNew2, "TARGET_AMT", xseed = 101, tests = FALSE)
 
-hist(asd2[[1]]$residuals)
+#hist(asd2[[1]]$residuals)
 
 
 #outliers:
@@ -387,7 +445,7 @@ hist(asd2[[1]]$residuals)
 dfNew_Out <- dfNew %>%
   dplyr::filter(abs(xresidual)>4000)
 
-hist(dfNew_Out$xresidual)
+#hist(dfNew_Out$xresidual)
 
 #EHSummarize_StandardPlots(dfNew_Out, "TARGET_AMT")
 
