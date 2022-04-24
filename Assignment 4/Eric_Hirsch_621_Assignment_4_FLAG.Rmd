@@ -182,9 +182,11 @@ dfNum_Flag <- df2Num %>%
 
 
 df8AMT <- df8 %>%
+  dplyr::filter(TARGET_FLAG==1.0) %>%
   dplyr::select(-TARGET_FLAG)
 
 dfNum_AMT <- df2Num %>%
+    dplyr::filter(TARGET_FLAG==1.0) %>%
   dplyr::select(-TARGET_FLAG, -INDEX)
 
 ```
@@ -317,8 +319,6 @@ grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 dfNum_AMT <- na.omit(dfNum_AMT)
 
-dfc7 <- dfNum_AMT
-
 aa <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE)
 hist(aa$residuals)
 
@@ -326,45 +326,37 @@ hist(aa$residuals)
 
 The base model shows a number of issues with the residuals including heteroskedastcity and particularly non-normal residuals.  We cannot use this model without some transformation.
 
-##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.
+##### Create Model 2 - a model with missings addressed and all of the transformed and added variables.  We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
+
 
 ```{r}
 
-#2. Remove main outliers - just results in new outliers and distribution is the same and still heteroskedastic
+df8AMT <- na.omit(df8AMT)
 
-dfc71 <- dfc7 %>%
-  dplyr::filter(rownames(dfc7) != 66, rownames(dfc7) != 26, rownames(dfc7) != 183, rownames(dfc7) != 570, rownames(dfc7) != 260, rownames(dfc7) != 147)
-
-bb <- EHModel_Regression_StandardLM(dfc71, "TARGET_AMT", tests = FALSE)
-#hist(bb[[1]]$residuals)
-
-#3. Log of y - still nonormal (but closer to normal) with outliers, but not homoskedatsic
-
-dfc72 <- dfc7
-dfc72$TARGET_AMT <- log(dfc72$TARGET_AMT+1)
-cc<- EHModel_Regression_StandardLM(dfc72, "TARGET_AMT", tests = FALSE)
-#hist(cc[[1]]$residuals)
+df8AMT$TARGET_AMT = log(df8AMT$TARGET_AMT+1)
+zz <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", splitRatio = 1, tests = FALSE)
+print(hist(df8AMT$TARGET_AMT))
+hist(zz$residuals)
 
 ```
-```{r}
+
+The adjusted-R-Squared is very low, despite the number of significant variables and significance overall. The distribution of the residuals imporves but the tails are still an issue.  There still appear to be a large number of outliers.
 
 
-# Add log terms - residuals closer to normal but not (not skewed but heavy tailed), and outliers remain
+##### Create Model 3 - a model using robust regression.
 
-dfc73 <- dfc72 %>%
-  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+If we remove a large number of outliers form the data our results improve dramatically. However, this must be true by definition as the variance will decrease when outliers are removed. A better way to discover the underlying pattern beneath the outliers (and to check that pattern against our second model) is robust regression.
 
-dfc73 <- na.omit(dfc73)
-zz <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", splitRatio = 1, tests = FALSE)
-print(hist(dfc73$TARGET_AMT))
-#hist(zz[[1]]$residuals)
+
+
+```{r, include=FALSE}
+
+qwe <- EHModel_Regression_StandardLM(df8AMT, "TARGET_AMT", tests = FALSE)
+qwr <- EHModel_Regression_Robust(df8AMT, "TARGET_AMT")
 
 ```
 
 ```{r}
-
-qwe <- EHModel_Regression_StandardLM(dfc73, "TARGET_AMT", tests = FALSE)
-qwr <- EHModel_Regression_Robust(dfc73, "TARGET_AMT")
 
 hist(qwe$residuals)
 hist(qwr[[1]]$residuals)
@@ -414,67 +406,6 @@ print(hist(dfc74$TARGET_AMT))
 #print(hist(uu[[1]]$residuals))
 ```
 
-```{r}
-#second try
-
-asd <- EHModel_Regression_StandardLM(dfc7, "TARGET_AMT", splitRatio = 1, xseed=101, tests = FALSE)
-
-xresidual <- asd$residuals
-
-
-dfMissing2 <- dfMissing %>%
-  dplyr::select(-TARGET_AMT)
-
-dfNew <- cbind(dfc7, xresidual)
-dfMissing2 <-cbind(dfMissing2, xresidual)
-  
-
-#hist(asd[[1]]$residuals)
-
-dfNew2 <- dfNew %>%
-  dplyr::filter(abs(xresidual)<4000) %>%
-  dplyr::select(-xresidual)
-
-asd2 <- EHModel_Regression_StandardLM(dfNew2, "TARGET_AMT", xseed = 101, tests = FALSE)
-
-#hist(asd2[[1]]$residuals)
-
-
-#outliers:
-
-dfNew_Out <- dfNew %>%
-  dplyr::filter(abs(xresidual)>4000)
-
-#hist(dfNew_Out$xresidual)
-
-#EHSummarize_StandardPlots(dfNew_Out, "TARGET_AMT")
-
-dfNew_Int <- dfNew %>%
-  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
-  dplyr::select(-xresidual)
-
-dfMissing3 <- dfMissing2 %>%
-  dplyr::mutate(resid_flag = ifelse(abs(xresidual)>4000,1,0)) %>%
-  dplyr::select(-xresidual)
-
-#wq <- EHExplore_Interactions_Scatterplots(dfNew_Int, "TARGET_AMT", "resid_flag")
-#grid.arrange(grobs = wq[c(1:12)], ncol=3, nrow=4)
-#grid.arrange(grobs = wq[c(13:24)], ncol=3, nrow=4)
-#grid.arrange(grobs = wq[c(25:36)], ncol=3, nrow=4)
-#grid.arrange(grobs = wq[c(37:39)], ncol=3, nrow=1)
-
-summary(dfNew2)
-str(dfNew2)
-
-we <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNew_Int, "resid_flag")
-grid.arrange(grobs = we[c(1,6,7,9,22,35)], ncol=3, nrow=2)
-
-EHExplore_TwoCategoricalColumns_Barcharts(dfMissing3, "resid_flag")
-
-
-mean(dfNew2$INCOME)
-mean(dfNew_Out$INCOME)
-```
 
 ```{r}
 EHModel_Regression_Robust(zz[[1]]$model, "TARGET_AMT")
