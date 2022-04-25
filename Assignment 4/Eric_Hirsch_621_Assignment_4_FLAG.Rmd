@@ -31,8 +31,8 @@ library(mice)
 ```
 ```{r}
 
-df2 <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance_training_data.csv")
-df2Eval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance-evaluation-data.csv")
+df2 <- read.csv("D:\\RStudio\\CUNY_621b\\Assignment 4\\insurance_training_data.csv")
+df2Eval <- read.csv("D:\\RStudio\\CUNY_621b\\Assignment 4\\insurance-evaluation-data.csv")
 
 ```
 
@@ -120,8 +120,14 @@ We create dummy variables from the character variables in the database.
 ```{r}
 
 
-df3 <- EHPrepare_CreateDummies(df2)
-df3Eval <- EHPrepare_CreateDummies(df2Eval)
+df3b <- EHPrepare_CreateDummies(df2, dropFirst=FALSE)
+df3Evalb <- EHPrepare_CreateDummies(df2Eval, dropFirst=FALSE)
+
+df3 <- df3b %>%
+  dplyr::select(-PARENT1_No, -MSTATUS_z_No, -SEX_M, -EDUCATION_PhD, -JOB_Professional, -CAR_USE_Private, -CAR_TYPE_Minivan, -RED_CAR_yes, -REVOKED_No, -URBANICITY_Highly.Urban..Urban)
+
+df3Eval <- df3Evalb %>%
+  dplyr::select(-PARENT1_No, -MSTATUS_z_No, -SEX_M, -EDUCATION_PhD, -JOB_Professional, -CAR_USE_Private, -CAR_TYPE_Minivan, -RED_CAR_yes, -REVOKED_No, -URBANICITY_Highly.Urban..Urban)
 
 df4 <- df3 %>%
    #dplyr::filter(row_number() %% 5 == 1)  %>%
@@ -318,7 +324,7 @@ zzz <- EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 
 
 ```{r, include=FALSE}
 
-a <- EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", lmRe)
+a <- EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 ```
 
 The refined model has an AIC of 7587.  This is not an improvement.
@@ -418,7 +424,7 @@ The following table summarizes the RSE and RSME when using robust regression on 
 ```{r, include = FALSE}
 
 robust1 <- rlm(TARGET_AMT ~ ., data=dfNum_AMT)
-robust2 <- rlm(TARGET_AMT ~ ., data=df8AMT)
+robust2 <- rlm(TARGET_AMT ~ ., data=df9AMT)
 robust3 <- rlm(TARGET_AMT ~ ., data=qwx$model)
 
 
@@ -460,18 +466,59 @@ The final step is to make predictions on the evaluation set.  First we predict t
 makeFlagPredictions <- function(m)
 {
 predictions <- as.data.frame(predict(m,newdata=df8FlagEval, type="response"))
+return(predictions)
 #write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
 }
 
-a <- makePredictions(zzz)
 
-head(a)
+makeAmountPredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=a4, type="response"))
+return(predictions)
+}
+
+a <- makeFlagPredictions(zzz)
+
+a2 <- a %>%
+  mutate(FLAG = ifelse(a[[1]]>=.5,1,0)) %>%
+  dplyr::select(FLAG) 
+
+a3 <- cbind(a2, df8FlagEval)
+
+a4 <- a3 %>%
+  mutate(TARGET_FLAG = FLAG) %>%
+  dplyr::select(-FLAG)
+```
+
+```{r}
+
+b <- makeAmountPredictions(robust2)
+
+b2 <- b %>%
+  mutate(AMOUNT = exp(b[[1]])-1) %>%
+  dplyr::select(AMOUNT) 
+
+b3 <- cbind(b2, a4)
+
+b4 <- b3 %>%
+  mutate(TARGET_AMT = ifelse(TARGET_FLAG==1.0, AMOUNT, 0)) %>%
+  dplyr::select(TARGET_AMT, TARGET_FLAG)
+
+summary(b4)
+```
+
+```{r}
+
+head(b4, 30)
 
 ```
 
+
 ### 5. Conclusion
 
-We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
+We examined 8161 insurance client records to create two predictive model:  whether the client would experience a crash, and the cash amount to be paid out. We used a logistic regression to accomplish the first, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
 
-Several enhancements to the model increased accuracy and lowered AIC.  First, some predictors were transformed with the log or square to improve fit. Second, dummy variables were introduced to capture the fact that highly industrial areas appeared to operate by a different logic than mixed use areas.  interaction terms to model this phenomenon did not improve the model.  The final model 93% accurate.
+As for the second, the dataset suffered from a non-normal distribution of residuals, brought about at least in part by an overabundance of outliers. In the end, we chose robust regression to manage the outliers.  
+
+Several enhancements to the model increased accuracy including log transformations and interaction terms.  Ultimately, the evaluation set had fewer accidents and lower payments than the training set, suggesting some problems with the model.
 
