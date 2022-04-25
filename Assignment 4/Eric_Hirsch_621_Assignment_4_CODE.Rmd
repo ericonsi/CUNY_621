@@ -1,0 +1,383 @@
+---
+title: "Eric_Hirsch_621_Assignment_4_Code"
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+library(patchwork)
+library(tidytable)
+library(MASS)
+library(mice)
+```
+```{r}
+
+df2 <- read.csv("D:\\RStudio\\CUNY_621b\\Assignment 4\\insurance_training_data.csv")
+df2Eval <- read.csv("D:\\RStudio\\CUNY_621b\\Assignment 4\\insurance-evaluation-data.csv")
+
+```
+
+```{r}
+
+library(readr)
+df2$OLDCLAIM <- parse_number(df2$OLDCLAIM)
+df2$INCOME <- parse_number(df2$INCOME)
+df2$HOME_VAL <- parse_number(df2$HOME_VAL)
+df2$BLUEBOOK <- parse_number(df2$BLUEBOOK)
+
+df2Eval$OLDCLAIM <- parse_number(df2Eval$OLDCLAIM)
+df2Eval$INCOME <- parse_number(df2Eval$INCOME)
+df2Eval$HOME_VAL <- parse_number(df2Eval$HOME_VAL)
+df2Eval$BLUEBOOK <- parse_number(df2Eval$BLUEBOOK)
+
+summary(df2)
+str(df2)
+
+```
+
+
+
+```{r}
+a <- EHSummarize_SingleColumn_Boxplots(df2)
+grid.arrange(grobs=a[c(2:16)], ncol=4)
+
+```
+
+
+```{r}
+
+a2 <-EHSummarize_SingleColumn_Histograms(df2)
+grid.arrange(grobs=a2[c(2:16)], ncol=4)
+```
+
+
+```{r}
+
+df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+df2NumEval <- df2Eval %>%
+  dplyr::select_if(is.numeric)
+
+EHExplore_Multicollinearity(df2Num, run_all=FALSE)
+
+```
+
+```{r}
+
+
+df3b <- EHPrepare_CreateDummies(df2, dropFirst=FALSE)
+df3Evalb <- EHPrepare_CreateDummies(df2Eval, dropFirst=FALSE)
+
+df3 <- df3b %>%
+  dplyr::select(-PARENT1_No, -MSTATUS_z_No, -SEX_M, -EDUCATION_PhD, -JOB_Professional, -CAR_USE_Private, -CAR_TYPE_Minivan, -RED_CAR_yes, -REVOKED_No, -URBANICITY_Highly.Urban..Urban)
+
+df3Eval <- df3Evalb %>%
+  dplyr::select(-PARENT1_No, -MSTATUS_z_No, -SEX_M, -EDUCATION_PhD, -JOB_Professional, -CAR_USE_Private, -CAR_TYPE_Minivan, -RED_CAR_yes, -REVOKED_No, -URBANICITY_Highly.Urban..Urban)
+
+df4 <- df3 %>%
+   #dplyr::filter(row_number() %% 5 == 1)  %>%
+  dplyr::select(-INDEX)
+
+df4Eval <- df3Eval %>%
+   #dplyr::filter(row_number() %% 5 == 1)  %>%
+  dplyr::select(-INDEX)
+
+```
+
+```{r, include=FALSE}
+
+g <- EHSummarize_MissingValues(df4)
+
+df5 <- df4 %>%
+  mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
+
+df5Eval <- df4Eval %>%
+  mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
+
+df6 <- df5 %>%
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+
+df6Eval <- df5Eval %>%
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+
+mice1 <- mice(df6,m=5,seed=2)
+df7 <- complete(mice1,1)
+
+mice1Eval <- mice(df6Eval,m=5,seed=2)
+df7Eval <- complete(mice1Eval,1)
+
+```
+
+```{r}
+
+print(g[1])
+
+```
+
+
+```{r}
+
+df8 <- df7 %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+
+df8Eval <- df7Eval %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+```
+
+
+```{r}
+
+df8Flag <- df8 %>%
+  dplyr::select(-TARGET_AMT)
+
+dfNum_Flag <- df2Num %>%
+  dplyr::select(-TARGET_AMT, -INDEX)
+
+
+df8AMT <- df8 %>%
+  dplyr::filter(TARGET_FLAG==1.0) %>%
+  dplyr::select(-TARGET_FLAG)
+
+dfNum_AMT <- df2Num %>%
+    dplyr::filter(TARGET_FLAG==1.0) %>%
+  dplyr::select(-TARGET_FLAG, -INDEX)
+
+df8FlagEval <- df8Eval
+
+dfNum_FlagEval <- df2NumEval %>%
+  dplyr::select(-INDEX)
+
+
+df8AMTEval <- df8Eval %>%
+  dplyr::select(-TARGET_FLAG)
+
+dfNum_AMTEval <- df2NumEval %>%
+  dplyr::select(-INDEX)
+
+```
+
+
+```{r}
+
+
+
+ty <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNum_Flag, "TARGET_FLAG")
+
+grid.arrange(grobs=ty[c(2:9)], ncol=2, nrow=4)
+grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
+
+```
+
+
+
+```{r}
+
+EHModel_Regression_Logistic(dfNum_Flag, "TARGET_FLAG", splitRatio = 1, xseed=10)
+```
+
+```{r, include=FALSE}
+
+EHModel_Regression_Logistic_Iterations(dfNum_Flag, "TARGET_FLAG")
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic(df8Flag, "TARGET_FLAG", splitRatio = 1, xseed =10)
+
+```
+
+```{r, include=FALSE}
+
+EHModel_Regression_Logistic_Iterations(df8Flag, "TARGET_FLAG")
+
+```
+
+```{r}
+
+df7b <- df8Flag %>%
+  dplyr::select(-JOB_Home.Maker, -CAR_TYPE_Panel.Truck, -EDUCATION_Bachelors, -JOB_Doctor, -JOB_Clerical, -tif_log, -mvr_pts_log, -carage_log, -clm_freq_log, -CLM_FREQ, -bluebook_log, -yojSquared)
+
+df7c <- df7b %>%
+  dplyr::select(-RED_CAR_no, -YOJ, -JOB_z_Blue.Collar, -EDUCATION_.High.School, -kidsdriv_log, -MVR_PTS)
+
+df7d <- df7c %>%
+  dplyr::select(-KIDSDRIV, -travtime_log, -MSTATUS_Yes, -HOME_VAL)
+
+
+df7e <- df7d %>%
+  dplyr::select(-REVOKED_Yes, -JOB_Student, -income_log, -ageSquared, -AGE, -CAR_AGE, -CAR_TYPE_Van)
+
+df7f <- df7e %>%
+  dplyr::select(-homekids_log, -HOMEKIDS, -homeval_log, -INCOME_NA, -YOJ_NA, -CAR_AGE_NA, -JOB_, -EDUCATION_z_High.School, -EDUCATION_Masters, -JOB_Lawyer)
+
+```
+
+```{r}
+
+zzz <- EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10, returnLM=TRUE)
+
+```
+
+```{r, include=FALSE}
+
+a <- EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
+```
+
+```{r}
+
+tab <- matrix(c(.748, .79, .77, 5266, 5723, 5805, .716, .815, .795), ncol=3, byrow=TRUE)
+colnames(tab) <- c('Base Model','Kitchen Sink Model','Refined Model')
+rownames(tab) <- c('Accuracy','AIC','AUC')
+tab <- as.table(tab)
+
+knitr::kable(tab)
+
+```
+
+
+```{r}
+
+ws <- EHExplore_TwoContinuousColumns_Scatterplots(dfNum_AMT, "TARGET_AMT")
+grid.arrange(grobs=ws[c(2:14)], ncol=4)
+
+```
+
+```{r}
+#1. Base - outliers and non-normal distribution and heteroskedastic
+
+dfNum_AMT <- na.omit(dfNum_AMT)
+
+x <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
+
+```
+
+
+```{r}
+
+df8AMT <- na.omit(df8AMT)
+df9AMT <- df8AMT
+
+df9AMT$TARGET_AMT = log(df9AMT$TARGET_AMT+1)
+zz <- EHModel_Regression_StandardLM(df9AMT, "TARGET_AMT", splitRatio = 1, xseed=10, tests = FALSE)
+hist(zz$residuals)
+
+```
+
+```{r, include=FALSE}
+
+qwe <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
+
+qwr <- EHModel_Regression_Robust(dfNum_AMT, "TARGET_AMT")
+
+qwx <- EHModel_Regression_StandardLM(df9AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
+qwy <- EHModel_Regression_Robust(df9AMT, "TARGET_AMT")
+
+
+```
+
+
+```{r, include = FALSE}
+
+robust1 <- rlm(TARGET_AMT ~ ., data=dfNum_AMT)
+robust2 <- rlm(TARGET_AMT ~ ., data=df9AMT)
+robust3 <- rlm(TARGET_AMT ~ ., data=qwx$model)
+
+
+ols1 <- lm(TARGET_AMT ~ ., data=qwe$model)
+ols2 <- lm(TARGET_AMT~., data=qwx$model)
+
+#find residual standard error of ols model
+summary(ols1)$sigma
+
+#find residual standard error of robust model
+summary(robust1)$sigma
+
+summary(ols2)$sigma
+
+#find residual standard error of robust model
+summary(robust2)$sigma
+summary(robust3)$sigma
+```
+
+
+```{r}
+
+
+tab <- matrix(c(7605, .80, .016, .026, 2334, .573), ncol=2, byrow=TRUE)
+colnames(tab) <- c('Base Model', 'Refined Model')
+rownames(tab) <- c('Standard - Sigma','Standard - Adj-R^2','Robust - Sigma')
+tab <- as.table(tab)
+
+knitr::kable(tab)
+
+```
+
+```{r}
+
+makeFlagPredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=df8FlagEval, type="response"))
+return(predictions)
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
+}
+
+
+makeAmountPredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=a4, type="response"))
+return(predictions)
+}
+
+a <- makeFlagPredictions(zzz)
+
+a2 <- a %>%
+  mutate(FLAG = ifelse(a[[1]]>=.5,1,0)) %>%
+  dplyr::select(FLAG) 
+
+a3 <- cbind(a2, df8FlagEval)
+
+a4 <- a3 %>%
+  mutate(TARGET_FLAG = FLAG) %>%
+  dplyr::select(-FLAG)
+```
+
+```{r}
+
+b <- makeAmountPredictions(robust2)
+
+b2 <- b %>%
+  mutate(AMOUNT = exp(b[[1]])-1) %>%
+  dplyr::select(AMOUNT) 
+
+b3 <- cbind(b2, a4)
+
+b4 <- b3 %>%
+  mutate(TARGET_AMT = ifelse(TARGET_FLAG==1.0, AMOUNT, 0)) %>%
+  dplyr::select(TARGET_AMT, TARGET_FLAG)
+
+write_csv(b4, "D:\\RStudio\\CUNY_621b\\Assignment 4\\predictionsInsurance.csv")
+
+summary(b4)
+```
+
+```{r}
+
+head(b4, 30)
+
+```
+
+
