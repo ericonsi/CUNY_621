@@ -1,12 +1,5 @@
 ---
-title: "Eric_Hirsch_621_Assignment_4"
-subtitle: "Predicting Insurance Claims" 
-author: "Eric Hirsch"
-date: "4/7/2022"
-output:
-  pdf_document:
-    toc: true
-    toc_depth: 4
+title: "Eric_Hirsch_621_Assignment_4_Code"
 ---
 
 ```{r setup, include=FALSE, warning=FALSE, message=FALSE}
@@ -36,17 +29,6 @@ df2Eval <- read.csv("D:\\RStudio\\CUNY_621b\\Assignment 4\\insurance-evaluation-
 
 ```
 
-We examine records of car insurance customers to build two predictive models: one for whether the customer would have crashed, and second, the $ amount paid for the crash.  
-
-The main issue in the dataset are outliers.  Without transformation, the distribution of residuals is not normal, and there are too many influential points to create reliable models.
-
-### 1. Data Exploration
-
-
-#### A. Summary Statistics
-
-We first examine the data. The dataset consists of 8161 observations and 26 variables (including two target variables, TARGET_FLAG and TARGET_AMT). 14 of the predictor variables are numeric. Approximately 27% of customers had an accident - the rest did not. TARGET_AMT appears to be highly skewed.  There is a large degree of missing values.
-
 ```{r}
 
 library(readr)
@@ -66,14 +48,6 @@ str(df2)
 ```
 
 
-#### B. Distributions
-
-We examine distributions of numeric variables through boxplots and histograms:
-
-##### 1. Boxplots
-\
-
-The boxplots show significant skewness and outliers.
 
 ```{r}
 a <- EHSummarize_SingleColumn_Boxplots(df2)
@@ -81,10 +55,6 @@ grid.arrange(grobs=a[c(2:16)], ncol=4)
 
 ```
 
-##### 2. Histograms
-\
-
-We can see from the histograms a number of opportunities to perform log and other transformations.
 
 ```{r}
 
@@ -92,12 +62,6 @@ a2 <-EHSummarize_SingleColumn_Histograms(df2)
 grid.arrange(grobs=a2[c(2:16)], ncol=4)
 ```
 
-Many of the variables are highly skewed, particularly TARGET_AMT. The level of outliers is very high.
-
-
-#### C. Multicollinearity
-
-The chart below shows multicollinearity for numerical variables only. There are no surprises here - older people tend not to have children at home, income and home value are related, etc.  Multicollinearity does not present offhand as a major issue.
 
 ```{r}
 
@@ -110,12 +74,6 @@ df2NumEval <- df2Eval %>%
 EHExplore_Multicollinearity(df2Num, run_all=FALSE)
 
 ```
-
-### 2. Data Preparation
-
-#### A. Create Dummy Variables
-
-We create dummy variables from the character variables in the database.  
 
 ```{r}
 
@@ -138,12 +96,6 @@ df4Eval <- df3Eval %>%
   dplyr::select(-INDEX)
 
 ```
-
-#### B. Address Missing Values
-
-We consider the missing values. Over 20% of the records have missing values.
-
-We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
 
 ```{r, include=FALSE}
 
@@ -175,26 +127,6 @@ print(g[1])
 
 ```
 
-\
-
-####. C. Perform Transformations
-
-We perform log and other transformations, as well as add an interaction term, to the analysis.  These transformations are based on an examination of the distributions of the indepenent variables.  They include:
-
-ageSquared\
-yojSquared\
-income_log\
-homeval_log\
-travtime_log\
-bluebook_log\
-carage_log\
-oldclaim_log\
-clm_freq_log\
-mvr_pts_log\
-tif_log\
-kidsdriv_log\
-homekids_log\
-inter (interaction term = KIDSDRIV*AGE\
 
 ```{r}
 
@@ -205,8 +137,6 @@ df8Eval <- df7Eval %>%
   mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
 ```
 
-
-### 3. Predict TARGET_FLAG
 
 ```{r}
 
@@ -239,9 +169,6 @@ dfNum_AMTEval <- df2NumEval %>%
 
 ```
 
-#### A. Explore relationships
-
-We can see from the boxplots run on the original numeric variables against TARGET_FLAG that the correlations are quite low. 
 
 ```{r}
 
@@ -255,9 +182,6 @@ grid.arrange(grobs=ty[c(10:15)], ncol=2, nrow=4)
 ```
 
 
-#### B. Create Models
-
-##### Create Model 1 - a base model with the original numeric variables.
 
 ```{r}
 
@@ -270,12 +194,6 @@ EHModel_Regression_Logistic_Iterations(dfNum_Flag, "TARGET_FLAG")
 
 ```
 
-Most of the predictors are significant.  This may in part be due to the fact that there are over 8,000 predictions.  The model has an AIC of 6702. Almost 20% of the records are missing so the model is not necessarily reliable.
-
-We run the model 100 times at a 80/20 split.  The base model has an accuracy of .748, an AIC of 5266 and an AUC of .716.
-
-##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.
-
 ```{r}
 
 EHModel_Regression_Logistic(df8Flag, "TARGET_FLAG", splitRatio = 1, xseed =10)
@@ -287,14 +205,6 @@ EHModel_Regression_Logistic(df8Flag, "TARGET_FLAG", splitRatio = 1, xseed =10)
 EHModel_Regression_Logistic_Iterations(df8Flag, "TARGET_FLAG")
 
 ```
-
-In the "kitchen sink" model many of the predictors are not significant.  This model risks overprediction. AIC has increased to 7269.
-
-We run the model 100 times at a 80/20 split.  The kitchen sink model has an accuracy of .79, an AIC of 5723 and an AUC of .815.  Despite possible overprediction, this model offers significant improvement.
-
-##### Create Model 3 - Use backward elmination to choose the best model:
-
-We use backward elimination to achieve a better fit and lower AIC.
 
 ```{r}
 
@@ -327,13 +237,6 @@ zzz <- EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 
 a <- EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
 ```
 
-The refined model has an AIC of 7587.  This is not an improvement.
-
-We run the model 100 times at a 80/20 split.  The refined model has an accuracy of .77, an AIC of 5805 and an AUC of .79.  Despite lower AIC, this model does not predict the data as well.  Again, the AIC does not fall and the model does not predict as well.
-
-#### 4. Select model
-
-Below is a table of results:
 ```{r}
 
 tab <- matrix(c(.748, .79, .77, 5266, 5723, 5805, .716, .815, .795), ncol=3, byrow=TRUE)
@@ -345,16 +248,6 @@ knitr::kable(tab)
 
 ```
 
-Despite the apparent superior predictability of the second model, we choose the third. This model has a lower AIC and is more interpretable and coherent than the second model.  
-
-### 4. Predict TARGET_AMT
-\
-
-Now we predict the target amount for those customers who have had an accident.
-
-#### A.Explore Relationships
-
-We look at scatterplots of numeric variables: 
 
 ```{r}
 
@@ -362,14 +255,6 @@ ws <- EHExplore_TwoContinuousColumns_Scatterplots(dfNum_AMT, "TARGET_AMT")
 grid.arrange(grobs=ws[c(2:14)], ncol=4)
 
 ```
-
-We can see that correlations are quite low.
-
-#### B. Create models
-
-##### Create Model 1 - the base model with the original numeric variables.
-
-We use stepAIC to choose the best model. The model retains very few predictor variables.
 
 ```{r}
 #1. Base - outliers and non-normal distribution and heteroskedastic
@@ -379,12 +264,6 @@ dfNum_AMT <- na.omit(dfNum_AMT)
 x <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", tests=FALSE, splitRatio=1, xseed=10)
 
 ```
-
-The base model shows a number of issues with the residuals including heteroskedastcity and particularly non-normal residuals.  We cannot use this model without some transformation.
-
-##### Create Model 2 - a model with missing values addressed and all of the transformed and added variables included.  
-
-We also take the log of TARGET_AMT.  We find the model with the highest AIC using stepAIC from the MASS package in R.  
 
 
 ```{r}
@@ -398,13 +277,6 @@ hist(zz$residuals)
 
 ```
 
-The adjusted-R-Squared is very low, despite the number of significant variables and significance overall. The distribution of the residuals improves but the tails are still an issue.  There still appear to be a large number of outliers.
-
-
-##### Create Model 3 - a model using robust regression.
-
-If we remove a large number of outliers form the data our results improve dramatically. However, this must be true by definition as the variance will decrease when outliers are removed. A better way to discover the underlying pattern beneath the outliers (and to check that pattern against our second model) is robust regression.
-
 ```{r, include=FALSE}
 
 qwe <- EHModel_Regression_StandardLM(dfNum_AMT, "TARGET_AMT", splitRatio=1, xseed=10, tests = FALSE, returnLM = TRUE)
@@ -416,9 +288,6 @@ qwy <- EHModel_Regression_Robust(df9AMT, "TARGET_AMT")
 
 
 ```
-#### 4. Select model
-
-The following table summarizes the RSE and RSME when using robust regression on the base and refined models:
 
 
 ```{r, include = FALSE}
@@ -456,10 +325,6 @@ tab <- as.table(tab)
 knitr::kable(tab)
 
 ```
-
-It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. In addition, the robust model clearly outperforms the standard model.  We therefore choose the robust refined model.
-
-The final step is to make predictions on the evaluation set.  First we predict the whether the client will have an accident. Then we predict amount for those with an accident:
 
 ```{r}
 
@@ -504,9 +369,9 @@ b4 <- b3 %>%
   mutate(TARGET_AMT = ifelse(TARGET_FLAG==1.0, AMOUNT, 0)) %>%
   dplyr::select(TARGET_AMT, TARGET_FLAG)
 
-summary(b4)
+write_csv(b4, "D:\\RStudio\\CUNY_621b\\Assignment 4\\predictionsInsurance.csv")
 
-write_csv(b4, "D:\\RStudio\\CUNY_621b\\predictionsInsurance.csv")
+summary(b4)
 ```
 
 ```{r}
@@ -515,12 +380,4 @@ head(b4, 30)
 
 ```
 
-
-### 5. Conclusion
-
-We examined 8161 insurance client records to create two predictive model:  whether the client would experience a crash, and the cash amount to be paid out. We used a logistic regression to accomplish the first, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
-
-As for the second, the dataset suffered from a non-normal distribution of residuals, brought about at least in part by an overabundance of outliers. In the end, we chose robust regression to manage the outliers.  
-
-Several enhancements to the model increased accuracy including log transformations and interaction terms.  Ultimately, the evaluation set had fewer accidents and lower payments than the training set, suggesting some problems with the model.
 
