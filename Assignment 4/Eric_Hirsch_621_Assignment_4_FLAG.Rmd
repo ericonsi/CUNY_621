@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r, include=FALSE}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData", force=TRUE)
+devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -31,10 +31,8 @@ library(mice)
 ```
 ```{r}
 
-df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
-dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
-
 df2 <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance_training_data.csv")
+df2Eval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 4\\insurance-evaluation-data.csv")
 
 ```
 
@@ -57,8 +55,10 @@ df2$INCOME <- parse_number(df2$INCOME)
 df2$HOME_VAL <- parse_number(df2$HOME_VAL)
 df2$BLUEBOOK <- parse_number(df2$BLUEBOOK)
 
-df2Crashed <- df2 %>%
-  dplyr::filter(TARGET_FLAG==1.0)
+df2Eval$OLDCLAIM <- parse_number(df2Eval$OLDCLAIM)
+df2Eval$INCOME <- parse_number(df2Eval$INCOME)
+df2Eval$HOME_VAL <- parse_number(df2Eval$HOME_VAL)
+df2Eval$BLUEBOOK <- parse_number(df2Eval$BLUEBOOK)
 
 summary(df2)
 str(df2)
@@ -88,8 +88,8 @@ We can see from the histograms a number of opportunities to perform log and othe
 
 ```{r}
 
-a <-EHSummarize_SingleColumn_Histograms(df2)
-grid.arrange(grobs=a[c(2:16)], ncol=4)
+a2 <-EHSummarize_SingleColumn_Histograms(df2)
+grid.arrange(grobs=a2[c(2:16)], ncol=4)
 ```
 
 Many of the variables are highly skewed, particularly TARGET_AMT. The level of outliers is very high.
@@ -102,6 +102,9 @@ The chart below shows multicollinearity for numerical variables only. There are 
 ```{r}
 
 df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+df2NumEval <- df2Eval %>%
   dplyr::select_if(is.numeric)
 
 EHExplore_Multicollinearity(df2Num, run_all=FALSE)
@@ -118,8 +121,13 @@ We create dummy variables from the character variables in the database.
 
 
 df3 <- EHPrepare_CreateDummies(df2)
+df3Eval <- EHPrepare_CreateDummies(df2Eval)
 
 df4 <- df3 %>%
+   #dplyr::filter(row_number() %% 5 == 1)  %>%
+  dplyr::select(-INDEX)
+
+df4Eval <- df3Eval %>%
    #dplyr::filter(row_number() %% 5 == 1)  %>%
   dplyr::select(-INDEX)
 
@@ -138,11 +146,20 @@ g <- EHSummarize_MissingValues(df4)
 df5 <- df4 %>%
   mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
 
+df5Eval <- df4Eval %>%
+  mutate(INCOME=ifelse(INCOME==0, NA, INCOME), HOME_VAL=ifelse(HOME_VAL==0, NA, HOME_VAL))
+
 df6 <- df5 %>%
+  mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+
+df6Eval <- df5Eval %>%
   mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
 
 mice1 <- mice(df6,m=5,seed=2)
 df7 <- complete(mice1,1)
+
+mice1Eval <- mice(df6Eval,m=5,seed=2)
+df7Eval <- complete(mice1Eval,1)
 
 ```
 
@@ -177,6 +194,9 @@ inter (interaction term = KIDSDRIV*AGE\
 
 df8 <- df7 %>%
   mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
+
+df8Eval <- df7Eval %>%
+  mutate(ageSquared = AGE^2, yojSquared = YOJ^2, income_log = log(INCOME+1), homeval_log = log(HOME_VAL+1),travtime_log = log(TRAVTIME+1), bluebook_log = log(BLUEBOOK+1), carage_log = log(CAR_AGE+1), oldclaim_log = log(OLDCLAIM+1), clm_freq_log = log(CLM_FREQ+1), mvr_pts_log = log(MVR_PTS+1), tif_log = log(TIF+1), kidsdriv_log=log(KIDSDRIV+1), homekids_log=log(HOMEKIDS+1), inter = KIDSDRIV*AGE)
 ```
 
 
@@ -198,6 +218,18 @@ df8AMT <- df8 %>%
 dfNum_AMT <- df2Num %>%
     dplyr::filter(TARGET_FLAG==1.0) %>%
   dplyr::select(-TARGET_FLAG, -INDEX)
+
+df8FlagEval <- df8Eval
+
+dfNum_FlagEval <- df2NumEval %>%
+  dplyr::select(-INDEX)
+
+
+df8AMTEval <- df8Eval %>%
+  dplyr::select(-TARGET_FLAG)
+
+dfNum_AMTEval <- df2NumEval %>%
+  dplyr::select(-INDEX)
 
 ```
 
@@ -280,13 +312,13 @@ df7f <- df7e %>%
 
 ```{r}
 
-EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10)
+zzz <- EHModel_Regression_Logistic(df7f, "TARGET_FLAG", splitRatio = 1, xseed = 10, returnLM=TRUE)
 
 ```
 
 ```{r, include=FALSE}
 
-EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG")
+a <- EHModel_Regression_Logistic_Iterations(df7f, "TARGET_FLAG", lmRe)
 ```
 
 The refined model has an AIC of 7587.  This is not an improvement.
@@ -420,6 +452,22 @@ knitr::kable(tab)
 ```
 
 It should be noted that the refined model sigma is not comparable to the base model because we have taken the log of the dependent variable.  The refined model clearly outperforms the base model. In addition, the robust model clearly outperforms the standard model.  We therefore choose the robust refined model.
+
+The final step is to make predictions on the evaluation set.  First we predict the whether the client will have an accident. Then we predict amount for those with an accident:
+
+```{r}
+
+makeFlagPredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=df8FlagEval, type="response"))
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
+}
+
+a <- makePredictions(zzz)
+
+head(a)
+
+```
 
 ### 5. Conclusion
 
