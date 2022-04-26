@@ -51,7 +51,7 @@ str(df)
 ```{r}
 library(psych)
 
-a <- EHSummarize_StandardPlots(df, "TARGET", type="scatter")
+#a <- EHSummarize_StandardPlots(df, "TARGET", type="scatter")
 ```
 
 Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all of them which identifies certain areas as highly industrial with a different crime logic, as opposed to the mixed industrial and residential areas for the rest of the observations.  
@@ -85,13 +85,30 @@ print (g)
 ```{r}
 
 df6 <- df %>%
-  mutate(STARS_NA = ifelse(is.na(STARS),0,1), Sulphates_NA = ifelse(is.na(Sulphates),0,1), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),0,1), Alcohol_NA = ifelse(is.na(Alcohol),0,1), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),0,1), Chlorides_NA = ifelse(is.na(Chlorides),0,1), ResidualSugar_NA = ifelse(is.na(ResidualSugar),0,1), pH_NA = ifelse(is.na(pH),0,1))
+  mutate(STARS_NA = ifelse(is.na(STARS),1,0), Sulphates_NA = ifelse(is.na(Sulphates),1,0), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),1,0), Alcohol_NA = ifelse(is.na(Alcohol),1,0), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),1,0), Chlorides_NA = ifelse(is.na(Chlorides),1,0), ResidualSugar_NA = ifelse(is.na(ResidualSugar),1,0), pH_NA = ifelse(is.na(pH),1,0))
 
 ```
+We investigate STARS_NA further:
+
+```{r}
+
+EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(df6, "STARS_NA")
+
+
+```
+we remove the outliers
+
+```{r}
+
+df6a <- df6 %>%
+  dplyr::filter(STARS_NA == 0 | TARGET != 8)
+  
+```
+
 
 ```{r, include=FALSE}
 library(mice)
-mice1 <- mice(df6,m=5,seed=2)
+mice1 <- mice(df6a,m=5,seed=2)
 df7 <- complete(mice1,1) 
 
 ```
@@ -105,11 +122,12 @@ write.csv(df7Small, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
 
 ```
 
+
 ```{r}
 library(MASS)
 
 df7Inter <- df7 %>%
-  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex)
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
 
 df7a <- EHPrepare_ScaleAllButTarget(df7Inter, "TARGET")
 
