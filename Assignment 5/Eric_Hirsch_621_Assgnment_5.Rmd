@@ -101,14 +101,19 @@ df7 <- complete(mice1,1)
 df7Small <- df7 %>%
  dplyr::filter(row_number() %% 20 == 1)
 
-write.csv(df7, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
+write.csv(df7Small, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
 
 ```
 
 ```{r}
 library(MASS)
 
-df7a <- EHPrepare_ScaleAllButTarget(df7, "TARGET")
+df7Inter <- df7 %>%
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex)
+
+df7a <- EHPrepare_ScaleAllButTarget(df7Inter, "TARGET")
+
+
 a <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10)
 
 ```
