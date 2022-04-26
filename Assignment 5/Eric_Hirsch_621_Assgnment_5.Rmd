@@ -138,6 +138,8 @@ a <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, 
 
 library(broom)
 aa <- tidy(a)
+write.csv(aa, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\Standard.csv")
+
 
 ```
 
@@ -147,6 +149,8 @@ modp <- glm(TARGET ~., family=poisson, df7a)
 summary(modp)
 halfnorm(residuals(modp)) 
 
+bb <- tidy(modp)
+write.csv(bb, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\poisson.csv")
 ```
 ```{r}
 
@@ -154,6 +158,9 @@ library(faraway)
 modd <- glm(TARGET ~., family=quasipoisson, df7a)  
 summary(modd)
 halfnorm(residuals(modd)) 
+
+cc <- tidy(modd)
+write.csv(cc, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\quasipoisson.csv")
 
 ```
 ```{r}
@@ -166,6 +173,9 @@ model.zi = zeroinfl(TARGET ~ .,
                     data = df7a,
                     dist = "poisson")
 summary(model.zi)
+
+#dd <- tidy(model.zi)
+#write.csv(dd, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\zeroinf1.csv")
 ```
 
 ```{r}
