@@ -51,7 +51,7 @@ str(df)
 ```{r}
 library(psych)
 
-a <- EHSummarize_StandardPlots(df, "TARGET", type="scatter")
+#a <- EHSummarize_StandardPlots(df, "TARGET", type="scatter")
 ```
 
 Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all of them which identifies certain areas as highly industrial with a different crime logic, as opposed to the mixed industrial and residential areas for the rest of the observations.  
@@ -97,6 +97,9 @@ df7 <- complete(mice1,1)
 ```
 
 ```{r}
+
+df7Small <- df7 %>%
+ dplyr::filter(row_number() %% 20 == 1)
 
 write.csv(df7, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
 
