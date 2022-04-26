@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -26,13 +26,13 @@ library(car)
 ```
 ```{r}
 
-df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
-dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+#dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+
+df <- df %>%
+  dplyr::select(-INDEX)
 
 ```
-
-
-
 
 ### 1. Data Exploration
 
@@ -51,7 +51,7 @@ str(df)
 ```{r}
 library(psych)
 
-a <- EHSummarize_StandardPlots(df, "target", type="box")
+a <- EHSummarize_StandardPlots(df, "TARGET", type="scatter")
 ```
 
 Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all of them which identifies certain areas as highly industrial with a different crime logic, as opposed to the mixed industrial and residential areas for the rest of the observations.  
@@ -69,6 +69,109 @@ EHExplore_Multicollinearity(df, run_all=FALSE)
 ```
 
 ### 2. Data Preparation
+
+#### B. Address Missing Values
+
+We consider the missing values. Over 20% of the records have missing values.
+
+We disregard missing values in character columns because these NAs were isolated out in their own columns when we dummified the data. We convert the 0s in INCOME and HOME_VAL to NA since 0 is implausible.  We create flags to track the NAs for the columns with the most significant NAs - INCOME, HOME_VAL, CAR_AGE, and YOJ.  Finally we use MICE to populate the missing values.
+
+```{r}
+
+g <- EHSummarize_MissingValues(df)
+print (g)
+```
+
+```{r}
+
+df6 <- df %>%
+  mutate(STARS_NA = ifelse(is.na(STARS),0,1), Sulphates_NA = ifelse(is.na(Sulphates),0,1), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),0,1), Alcohol_NA = ifelse(is.na(Alcohol),0,1), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),0,1), Chlorides_NA = ifelse(is.na(Chlorides),0,1), ResidualSugar_NA = ifelse(is.na(ResidualSugar),0,1), pH_NA = ifelse(is.na(pH),0,1))
+
+```
+
+```{r, include=FALSE}
+library(mice)
+mice1 <- mice(df6,m=5,seed=2)
+df7 <- complete(mice1,1) 
+
+```
+
+```{r}
+
+write.csv(df7, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
+
+```
+
+```{r}
+library(MASS)
+
+df7a <- EHPrepare_ScaleAllButTarget(df7, "TARGET")
+a <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10)
+
+```
+
+```{r}
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df7a)  
+summary(modp)
+halfnorm(residuals(modp)) 
+
+```
+```{r}
+
+library(faraway)
+modd <- glm(TARGET ~., family=quasipoisson, df7a)  
+summary(modd)
+halfnorm(residuals(modd)) 
+
+```
+```{r}
+
+
+
+library(pscl)
+
+model.zi = zeroinfl(TARGET ~ .,
+                    data = df7a,
+                    dist = "poisson")
+summary(model.zi)
+```
+
+```{r}
+
+
+library(car)
+
+Anova(model.zi,
+      type="II",
+      test="Chisq")
+
+
+library(rcompanion)
+
+nagelkerke(model.zi)
+
+library(multcompView)
+library(multcomp)
+
+library(emmeans)
+
+marginal = emmeans(model.zi,
+                   ~ STARS)
+
+pairs(marginal,
+      adjust="tukey")
+
+cld(marginal,
+    alpha=0.05,
+    Letters=letters,  ### Use lower-case letters for .group
+    adjust="tukey")   ### Tukey adjustment for multiple comparisons
+
+
+
+
+```
+
 
 #### A. Interaction terms
 
