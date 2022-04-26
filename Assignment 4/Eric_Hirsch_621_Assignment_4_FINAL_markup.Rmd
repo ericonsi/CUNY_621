@@ -160,12 +160,18 @@ df6 <- df5 %>%
 
 df6Eval <- df5Eval %>%
   mutate(YOJ_NA = ifelse(is.na(YOJ),0,1), INCOME_NA = ifelse(is.na(INCOME),0,1), CAR_AGE_NA = ifelse(is.na(CAR_AGE),0,1), HOME_VAL_NA = ifelse(is.na(HOME_VAL),0,1))
+```
 
-mice1 <- mice(df6,m=5,seed=2)
-df7 <- complete(mice1,1)
+```{r, include=FALSE}
+#mice1 <- mice(df6,m=5,seed=2)
+#df7 <- complete(mice1,1)
 
-mice1Eval <- mice(df6Eval,m=5,seed=2)
-df7Eval <- complete(mice1Eval,1)
+#mice1Eval <- mice(df6Eval,m=5,seed=2)
+#df7Eval <- complete(mice1Eval,1)
+
+df7 <- EHPrepare_MissingValues_Imputation(df6, impute = "median")
+df7Eval <- EHPrepare_MissingValues_Imputation(df6Eval, impute = "median")
+
 
 ```
 
@@ -503,6 +509,8 @@ b3 <- cbind(b2, a4)
 b4 <- b3 %>%
   mutate(TARGET_AMT = ifelse(TARGET_FLAG==1.0, AMOUNT, 0)) %>%
   dplyr::select(TARGET_AMT, TARGET_FLAG)
+
+write_csv(b4, "D:\\RStudio\\CUNY_621\\Assignment 4\\predictionsInsurance.csv")
 
 summary(b4)
 ```
