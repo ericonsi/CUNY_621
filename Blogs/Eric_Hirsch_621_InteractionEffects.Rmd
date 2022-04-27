@@ -1,0 +1,54 @@
+---
+title: "Interaction Effects"
+author: "Eric Hirsch, CUNY 621"
+date: "3/27/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, warnings=FALSE, messages=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings=FALSE, messages=FALSE)
+
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+
+library(lmtest)
+library(dplyr)
+library(MASS)
+library(EHData)
+library(gridExtra)
+library(tidyverse)
+
+
+```
+
+<font size=3>
+
+*__What are interaction effects?__*
+
+Sometimes predictor variables depend on each other. This isn’t the same as multicollinearity, where certain predictor variables move in the same direction. When we’re talking about interaction effects, we mean situations where the slope of a variable with respect to the target variable changes depending on the value of another variable.
+
+*__What are some examples?__*
+
+Interaction effects are quite common and here are some examples:
+\
+In a study looking at health benefits, we might find that a weightlifting contributes to the health of younger people, but damages the health of older people.
+\
+In a study looking at consumer preferences, we might find that poor individuals are less interested in purchasing a commodity as the price goes up, while more affluent individuals, more interested in status, might be more likely to purchase a commodity as the price goes up.  (In these scenarios sellers are able to increase gross sales by raising, not lowering their prices.  This phenomenon drove the sales of sparkling waters when they first appeared on the market.)
+
+*__How do we handle interaction effects in regression?__*
+
+We can handle interaction effects in regression by creating a term which is a product of the two effects that are interacting. Using the example above, we might multiply the amount of weight lifted by a dummy variable indicating whether the individual was younger or older.
+
+*__How do we know when there are interaction effects in our data?__*
+
+We can use interaction plots, where we display fitted values for the data under both conditions. For example, we might plot a regression line of the health benefits from weightlifting against for both younger and older individuals in the same plot. If we see the lines crossed to a significant degree, we may suspected interaction effect. We still need to do hypothesis testing, as such an effect could occur randomly.
+
+.<font>
+
+```{r}
+
+library(faraway)
+
+data(gala)
+
+```
+
