@@ -30,7 +30,9 @@ Sometimes predictor variables depend on each other. This isn’t the same as mul
 
 Interaction effects are quite common and here are some examples:
 \
-In a study looking at health benefits, we might find that a weightlifting contributes to the health of younger people, but damages the health of older people.
+\
+In a study looking at health benefits, we might find that lifting more weights contributes to the health of younger people, but damages the health of older people.
+\
 \
 In a study looking at consumer preferences, we might find that poor individuals are less interested in purchasing a commodity as the price goes up, while more affluent individuals, more interested in status, might be more likely to purchase a commodity as the price goes up.  (In these scenarios sellers are able to increase gross sales by raising, not lowering their prices.  This phenomenon drove the sales of sparkling waters when they first appeared on the market.)
 
@@ -40,15 +42,48 @@ We can handle interaction effects in regression by creating a term which is a pr
 
 *__How do we know when there are interaction effects in our data?__*
 
-We can use interaction plots, where we display fitted values for the data under both conditions. For example, we might plot a regression line of the health benefits from weightlifting against for both younger and older individuals in the same plot. If we see the lines crossed to a significant degree, we may suspected interaction effect. We still need to do hypothesis testing, as such an effect could occur randomly.
+We can use interaction plots, where we display fitted values for the data under both conditions. For example, we might fit regression lines of the health benefits from weightlifting for both younger and older individuals on the same plot. If we see the lines cross to a significant degree, we may suspect interaction effect. We still need to do hypothesis testing, as such an effect could occur randomly.<font>
 
-.<font>
+Let's look more closely at interaction plots.  The plots below examine the interaction between gender and the other variables in the teengamb dataset from the faraway package, which looks at teenager's expenditures per year on gambling. (In this dataset, a sex of 1 means female.)
 
-```{r}
+
+```{r, include=FALSE}
 
 library(faraway)
 
-data(gala)
+data(teengamb)
+
+x <- EHExplore_Interactions_Scatterplots(teengamb, "gamble", "sex")
+
+```
+```{r}
+grid.arrange(grobs=x[c(2:4)], ncol=3)
 
 ```
 
+The interaction plots suggest that the other predictors' relationships to how much an individual spends on gambling depends heavily on gender.  This is especially the case with status - the plot suggests that the more high status a boy is, the less likely he is to gamble, while the more high status a girl is, the more likely she is to gamble.
+
+We can test this by adding the interaction term to a multiple regression model and examining the effect.
+
+First we run the regression without the term.
+
+```{r}
+
+summary(lm(gamble~., teengamb))
+
+```
+
+Now we add the term:
+
+```{r}
+teengamb2 <- teengamb %>%
+  mutate(InteractionTerm = sex*status)
+
+summary(lm(gamble~., teengamb2))
+```
+
+The new term is significant and the R-squared has improved. The sex variable's p value has fallen signicantly and its coefficient has changed.  We can interpret the interaction term and main effects as follows:
+
+First, the coefficients for sex and status only hold if the value of the other term is 0.  In other words, because male = 0, when the individual is male, status has a dampening effect. At the same time, when status is low or near 0, females are very unlikely to gamble.  This matches the findings from our interaction plot. As for the interaction term itself, it adds a bonus to the dependent variable of .992*status when the individual is female.  When the individual is male, the interaction term is 0.  
+
+In sum, interaction terms are important not only because they improve our R-squared and enhance the predictability of our model.  Without knowing about the interactions in our model, we might have drawn incorrect conclusions about the role of status and of gender.  When we find ourselves saying, "well, it depends .." then we have discovered an interaction term.
