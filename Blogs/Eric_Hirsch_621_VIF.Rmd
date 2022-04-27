@@ -1,7 +1,7 @@
 ---
 title: "Variance Inflation Factors"
 author: "Eric Hirsch, CUNY 621"
-date: "2/27/2022"
+date: "3/1/2022"
 output: html_document
 ---
 
@@ -35,6 +35,7 @@ Detecting multicollinearity has the same issue. Groups of predictor variables ma
 Instead of (or in addition to) examining pairwise correlations, we can set each predictor variable as the dependent variable in a multiple regression with the other predictor variables. This generates an R squared, which can be compared to the R squareds of the other predictor variables. In this way we can identify which predictors are most related to the other predictors.
 
 The Variance Inflation Factor (VIF) for each predictor variable is calculated as the reciprocal of one minus the R squared when the predictor variable is the dependent variable in a multiple regression with the other predictor variables as the independent variables.
+
 If the R squared is zero, the VIF is 1. Value significantly higher than 1 indicate predictors that will contribute less to the regression because the other predictors already explain a lot of their variation.
 
 *__Why is it “variance inflation”?__*
@@ -47,6 +48,30 @@ Predictor variables with a high VIF can be eliminated from the model without gre
 
 *__How do we calculate VIF?__*
 
-We could theoretically run a multiple regression in each predictor variable against all of the other predictor variables. This would give us the R squared we need to calculate the VIF. However, the vif function from the car library makes it easy.<font>
+We could theoretically run a multiple regression on each predictor variable against all of the other predictor variables. This would give us the R squared we need to calculate the VIF. However, the vif function from the car library makes it easy.<font>
+
+Below we demonstrate with the kanga dataset from the faraway package.  The dataset contains measurements of kangaroo skulls.  Since it is highly likely that each measurment is related to all the others, we expect the dataset to contain a high degree of multicollinearity.  Indeed, using the vif package, we see VIFs as high as 75.
+
+```{r, include=FALSE}
+library(faraway)
+library(car)
+```
+```{r}
+
+
+
+data(kanga)
+
+dfKanga <- kanga %>%
+  dplyr::select(-sex, -species)
+
+vif(model <- lm(palate.width ~ ., dfKanga))
+
+
+```
+
+It is evident from the high degree of multicollinearity that many of these predictors are reduntant.
+
+In sum, VIFs are a handy way to examine multicollinearity in a database.  They are superior to examining pairwise correlation, which may miss any multi-predictor effects.
 
 
