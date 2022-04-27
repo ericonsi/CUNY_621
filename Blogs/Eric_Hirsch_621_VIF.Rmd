@@ -1,0 +1,52 @@
+---
+title: "Variance Inflation Factors"
+author: "Eric Hirsch, CUNY 621"
+date: "2/27/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, warnings=FALSE, messages=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings=FALSE, messages=FALSE)
+
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+
+library(lmtest)
+library(dplyr)
+library(MASS)
+library(EHData)
+library(gridExtra)
+library(tidyverse)
+
+
+```
+
+<font size=3>
+*__The Problem of multicollinearity__*
+
+Multicollinearity in a data set occurs when predictor variables are correlated with each other. It’s often impossible to avoid multicollinearity entirely – however, when it is high, regression coefficients become unstable, shifting widely as the conditions of the regression change.  They may even switch from positive to negative. In addition, standard errors will be larger.   If two predictor variables are completely correlated, then regression becomes impossible.
+
+*__Detecting multicollinearity__*
+
+A common way of detecting multicollinearity is to examine all of the pairwise correlations in the data set. In this way it’s possible to see patterns that show in which way predictor variables are directly related. However, the point of running a multiple regression on a dependent variable instead of running individual correlations is that groups of predictor variables may act together in ways that aren’t evident when we examine them separately. For example, two predictor variables may explain more of the variation in regression than the sum of each one separately.
+Detecting multicollinearity has the same issue. Groups of predictor variables may explain other predictor variables in ways that aren’t immediately evident or direct.
+
+*__Variance Inflation Factors use the principles of multiple regression to examine multicollinearity__*
+
+Instead of (or in addition to) examining pairwise correlations, we can set each predictor variable as the dependent variable in a multiple regression with the other predictor variables. This generates an R squared, which can be compared to the R squareds of the other predictor variables. In this way we can identify which predictors are most related to the other predictors.
+
+The Variance Inflation Factor (VIF) for each predictor variable is calculated as the reciprocal of one minus the R squared when the predictor variable is the dependent variable in a multiple regression with the other predictor variables as the independent variables.
+If the R squared is zero, the VIF is 1. Value significantly higher than 1 indicate predictors that will contribute less to the regression because the other predictors already explain a lot of their variation.
+
+*__Why is it “variance inflation”?__*
+
+Correlations among the predictors increases the variance in a model.  The VIF tells you how much - a VIF of three, for example, means that the multicollinearity has increased the variance by a factor of three.
+
+*__How do we use VIF’s?__*
+
+Predictor variables with a high VIF can be eliminated from the model without great loss of explanatory power (because they essentially “duplicate” the explanatory power of at least some of the remaining predictor variables).  There is no consensus in the literature about how high a VIF should be, though five is often given as a threshold. We might look at it on a case-by-case basis - where there are few predictor variables with high VIFs they may simply be eliminated.  Where many of the variables show a high VIF, then we might need to rethink our strategy - why do so many variables duplicate explanatory power of other variables?  
+
+*__How do we calculate VIF?__*
+
+We could theoretically run a multiple regression in each predictor variable against all of the other predictor variables. This would give us the R squared we need to calculate the VIF. However, the vif function from the car library makes it easy.<font>
+
+
