@@ -1,0 +1,129 @@
+---
+title: "Ridge Regression"
+author: "Eric Hirsch, CUNY 621"
+date: "4/28/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, warnings=FALSE, messages=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings=FALSE, messages=FALSE)
+
+devtools::install_github("ericonsi/EHData", force=TRUE)
+
+library(lmtest)
+library(dplyr)
+library(MASS)
+library(EHData)
+library(gridExtra)
+library(tidyverse)
+
+
+```
+
+<font size=3>
+
+*__Why do we need another regression procedure? What is the problem with OLS?__*
+
+Ordinary Least Squares (OLS) is often the most reliable regression procedure to predict targets on unseen data. But this isn’t always the case.   if the model has a high degree of outliers or strong multicollinearity then the high variance within the model caused by these factors can become a problem. One of the possible unwanted results is *__overfitting__*. 
+
+*__What is overfitting?__*
+
+When a training model overfits the data, the model is unduly influenced by idiosyncrasies in the training set that don’t generalize well in the test set.  Examples of overfitting abound and even affect the way we make everyday assumptions. For example, assuming Johnny will be good at math because his two brothers were good at math is an overfit model.  
+
+There are many causes of overfitting, including those described above, but what they have in common is that they prioritize minimizing bias in the bias-variance ratio.  If we were modeling the weather, small shifts in precipitation and cloud cover would be taken seriously, at the risk of the possibility that different randomly-selected training sets would result in different estimates.  If instead we were less concerned about any particular training set and more concerned about generalizability, we would then introduce bias into our training estimates.
+
+*__What does ridge regression do to address the problem of overfitting?__*
+
+In ridge regression we use “regularization methods” which introduce bias and reduce variance. This lower variance model can actually improve our Meaning Squared Error. In fact, ridge regression allows us to find the optimal trade-off between bias and variance.
+
+In ridge regression, we reduce the size of our coefficients.  We do this by introducing a penalty in the loss function represented by the squared sum of the coefficients themselves, multiplied by a factor (designated as lambda) which allows us to control the degree to which the size of the coefficients matters. If lambda is zero, there is no difference between ridge gression and OLS.
+
+*__How does reducing the sum of the coefficients help reduce overfitting?__*
+
+It’s easiest to imagine this with one predictor. Using OLS on randomly generated training sets,  the slope of the line could vary considerably. We could reduce that variability completely by setting the coefficient to zero, giving us a horizontal line at the mean. But this wouldn’t be a very useful estimate. In between the two, there is a spot where variance and bias are best balanced and MSE is minimized.  Thus, the choice of lambda is very important.
+
+Let's try an example.  We'll use the kanga database from the faraway package because it is notorious for multicollinearity, which ridge addresses well.
+
+First, let's examine the VIFs from this database.  We see how large they are.
+
+```{r, include=FALSE}
+library(faraway)
+library(car)
+```
+```{r}
+
+
+data(kanga)
+
+dfKanga <- kanga %>%
+  dplyr::select(-sex, -species)
+
+dfKanga <- na.omit(dfKanga)
+
+vif(model <- lm(mandible.width ~ ., dfKanga))
+
+
+```
+Now let's model the data with OLS.
+
+```{r}
+
+EHPrepare_ScaleAllButTarget(dfKanga, "mandible.width")
+summary(lm(mandible.width ~., dfKanga))
+
+```
+
+Now let's try ridge regression.  First we create our basic model.
+
+```{r}
+
+library(glmnet)
+
+dfKanga2 <- dfKanga %>%
+    dplyr::select(-mandible.width)
+
+y <- dfKanga$mandible.width
+x <- data.matrix(dfKanga2)
+
+model <- glmnet(x, y, alpha = 0)
+
+```
+
+Then we find the optimal lambda by performing k-fold cross validation:
+
+```{r}
+cv_model <- cv.glmnet(x, y, alpha = 0)
+plot(cv_model)
+
+best_lambda <- cv_model$lambda.min
+best_lambda
+```
+
+The best lambda is 1.02386.  We add that lambda to the model and run it again.
+
+```{r}
+
+#plot(model, xvar = "lambda")
+
+best_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+coef(best_model)
+
+#calculate R-squared of model on training data
+y_predicted <- predict(model, s = best_lambda, newx = x)
+
+#find SST and SSE
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+
+#find R-Squared
+rsq <- 1 - sse / sst
+rsq
+
+```
+
+
+The new term is significant and the R-squared has improved. The sex variable's p value has fallen signicantly and its coefficient has changed.  We can interpret the interaction term and main effects as follows:
+
+First, the coefficients for sex and status only hold if the value of the other term is 0.  In other words, because male = 0, when the individual is male, status has a dampening effect. At the same time, when status is low or near 0, females are very unlikely to gamble.  This matches the findings from our interaction plot. As for the interaction term itself, it adds a bonus to the dependent variable of .992*status when the individual is female.  When the individual is male, the interaction term is 0.  
+
+In sum, interaction terms are important not only because they improve our R-squared and enhance the predictability of our model.  Without knowing about the interactions in our model, we might have drawn incorrect conclusions about the roles of status and of gender.  When we find ourselves saying, "well, it depends .." then we have discovered an interaction term.
