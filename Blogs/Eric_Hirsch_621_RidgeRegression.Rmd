@@ -112,4 +112,4 @@ knitr::kable(df3)
 
 We can see that the ridge regression reduces the size of many of the coefficients, though not all.  As long as the overall effect is to reduce the squared sum of coefficients times lambda, some coefficients might increase.
 
-In sum, ridge regression "flattens out" our model by reducing the coefficients compared to OLS.  This may introduce some bias, but it results in a model that generalizes better. R makes running ridge regression and selection the best lamda easy.
+In sum, ridge regression "flattens out" our model by reducing the coefficients compared to OLS.  This may introduce some bias, but it results in a model that generalizes better. R makes running ridge regression and selection the best lambda easy.
