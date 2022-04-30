@@ -70,6 +70,17 @@ EHExplore_Multicollinearity(df, run_all=FALSE)
 
 ```
 
+Run first poisson
+```{r}
+
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df)  
+summary(modp)
+halfnorm(residuals(modp)) 
+
+```
+
+
 ### 2. Data Preparation
 
 #### B. Address Missing Values
@@ -112,7 +123,6 @@ df6a <- df6 %>%
 library(mice)
 mice1 <- mice(df6a,m=5,seed=2)
 df7 <- complete(mice1,1) 
-
 ```
 
 ```{r}
@@ -132,13 +142,17 @@ df7Inter <- df7 %>%
   mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
 
 df7a <- EHPrepare_ScaleAllButTarget(df7Inter, "TARGET")
+```
 
+```{r}
+a1 <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, xstepAIC = FALSE, returnLM=TRUE, vif=FALSE)
 
-a <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, returnLM=TRUE)
+a <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, returnLM=TRUE, vif = FALSE)
 
 library(broom)
 aa <- tidy(a)
-write.csv(aa, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\Standard.csv")
+aa1 <- tidy(a)
+#write.csv(aa, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\Standard.csv")
 
 
 ```
@@ -150,7 +164,7 @@ summary(modp)
 halfnorm(residuals(modp)) 
 
 bb <- tidy(modp)
-write.csv(bb, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\poisson.csv")
+#write.csv(bb, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\poisson.csv")
 ```
 ```{r}
 
@@ -160,7 +174,7 @@ summary(modd)
 halfnorm(residuals(modd)) 
 
 cc <- tidy(modd)
-write.csv(cc, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\quasipoisson.csv")
+#write.csv(cc, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\quasipoisson.csv")
 
 ```
 ```{r}
