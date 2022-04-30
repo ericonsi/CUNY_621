@@ -26,8 +26,8 @@ library(car)
 ```
 ```{r}
 
-#df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
-df <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+#df <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
 
 #dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
 
