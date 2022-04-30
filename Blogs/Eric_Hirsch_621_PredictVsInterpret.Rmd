@@ -36,7 +36,7 @@ Below we discussed some examples using case studies:
 
 *__Feature selection__*
 
-<font color=blue>Imagine you run a diabetes clinic </font>which collects a fair amount of data on patients, including their AIC (indicative of diabetes) over time. You decide to run a regression in order to determine the relationship between patient data (demographics, treatments, etc.) and their change in A1c.  The type and number of features you select will be partly determined by the use case for the data.
+<font color=blue>Imagine you work for a diabetes clinic </font>which collects a fair amount of data on patients, including their AIC (indicative of diabetes) over time. You decide to run a regression in order to determine the relationship between patient data (demographics, treatments, etc.) and their change in A1c.  The type and number of features you select will be partly determined by the use case for the data.
 
 Do you want to predict as accurately as possible whether a new patient will see their A1c increase or decrease? Then you will want to include as much information as possible. Do you want to understand what drives changes in A1c? Then you might want to restrict yourself to a subset of the most important independent variables and understand how they work together.  Do you want a handy rule of thumb to give to our patients, such as “men of this age will get this treatment will reduce their A1c an average by X amount”? In this case you would want even fewer independent variables.
 
@@ -53,7 +53,15 @@ There are a number of reasons why coefficients may vary from test case to test c
 
 On the other hand, if we want to interpret our models, stability of coefficients is crucial. We need to know the direction of the relationship and the strength of the relationship if were to say anything at all about the meaning of that particular variable.
 
-<font color=blue>Imagine you are trying to determine the sex of a baboon by its skull</font>. You have 10 measurements per skull and 50 skulls.  The measurements on the skull are likely to be highly correlated, as large skulls will have larger measurements across the board. If the coefficients keep changing with every test set, it becomes difficult to develop the simple rule of thumb that allows you to make the determination. This is a situation where both prediction AND interpretation might benefit from a more simplified model.
+<font color=blue>Imagine you work for a paleontologist trying to determine the sex of a baboon by its skull</font>. You have 10 measurements per skull and 50 skulls.  The measurements on the skull are likely to be highly correlated, as large skulls will have larger measurements across the board. If the coefficients keep changing with every test set, it becomes difficult to develop the simple rule of thumb that allows you to make the determination. This is a situation where both prediction AND interpretation might benefit from a more simplified model.
+
+__*Meeting assumptions*__
+
+Because prediction metrics rely mostly on the performance of the model on unseen data, sometimes data scientists pay less attention to whether or not basic assumptions are met. For interpretation, which relies more heavily on statistical metrics, assumptions must be met in order to trust those metrics.
+
+<font color=blue>Imagine you work for the Forest Service attempting to get a ballpark of the number of forest fires likely to happen in a given place and season</font>.  You run a regression and find heteroscedasticity. This is going to interfere with your ability to make interpretations because heteroscedasticity will affect metrics that depend on variance (like P value and F statistic) and while your coefficients will remain unbiased, they may not be the most efficient.  In this case you would do which occurred to transform the dependent variable, or use weighted least squares or other techniques to reduce the heteroscedasticity.  
+
+However, if you are prediction metrics tell you that the model is good enough for a ballpark number of forest fires, you would not in this case need to address the heteroscedasticity if you are already satisfied with the model.
 
 *__It comes down to use case__*
 
