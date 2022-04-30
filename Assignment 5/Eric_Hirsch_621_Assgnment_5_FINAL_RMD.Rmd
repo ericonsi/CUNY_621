@@ -262,7 +262,7 @@ We can use backward elimination to see if we can decrease our AIC.
 ```{r}
 
 df7b <- df7a %>%
-  dplyr::select(-FixedAcidity, -ResidualSugar_NA, -Chlorides_NA, -FreeSulfurDioxide_NA, -CitricAcid, -Density, -Sulphates_NA, -Alcohol_NA,-Chlorides, -TotalSulpherDioxide_NA, -ResidualSugar)
+  dplyr::select(-FixedAcidity, -ResidualSugar_NA, -Chlorides_NA, -FreeSulfurDioxide_NA, -CitricAcid, -Density, -Sulphates_NA, -Alcohol_NA,-Chlorides, -TotalSulpherDioxide_NA, -ResidualSugar, -pH_NA)
 
 model.zi = zeroinfl(TARGET ~ .,
                     data = df7b,
@@ -275,7 +275,11 @@ print(paste("AIC: ", AIC(model.zi)))
 
 ```
 
-Our final model has an AIC of 40716, an improvement over the unoptimized model.
+Our final model has an AIC of 40715, an improvement over the unoptimized model.
+
+Even though our interaction terms are not significant, the AIC climbs considerably when they are removed from the model.  Therefore we retain them. 
+
+One issue is that some of our coefficients are no longer intuitive, particularly STARS and STARS_NA which are both the opposite of what they should be . However, with the presence of interaction terms involving these variables, their coefficients are not particularly stable.  When the interaction terms are removed, the coefficents return to the direction we would expect.
 
 ### 4. Select Model
 
