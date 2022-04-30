@@ -1,0 +1,306 @@
+---
+title: "Eric_Hirsch_621_Assignment_3"
+subtitle: "Predicting Wine Cases Bought" 
+author: "Eric Hirsch"
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include-FALSE}
+library(tidyverse)
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+```
+```{r}
+
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-evaluation-data.csv", fileEncoding="UTF-8-BOM")
+
+#df <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+
+#dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+
+df <- df %>%
+  dplyr::select(-INDEX)
+
+dfEval <- dfEval %>%
+  dplyr::select(-IN)
+
+
+```
+
+### 1. Data Exploration
+
+
+#### A. Summary Statistics
+
+We are modeling a data set containing information on approximately 12,000 commercially available wines. The variables are mostly related to the chemical properties of the wine being sold. The response variable, "TARGET", is the number of sample cases of wine that were purchased by wine distribution companies after sampling a wine. 
+
+We first examine the data. The dataset consists of 12795 observations and 15 variables, all numeric.  Some of the variables are count data, including the dependent varable "TARGET."  The target variable has a minimum of 0, a maximum of 8 and a median of 3.  Because of the small number of counts, this dataset is likely to be best modeled with a poisson or negative binomial count model.   
+
+The mssing values should also be noted.  There are a large number of missing values.  In the case of STARS, e.g., 26% of the values (3359) are missing.  We will need to make some decisions about these missing values.
+
+```{r}
+
+summary(df)
+str(df)
+
+```
+
+Now we examine distributions:
+
+
+```{r}
+
+dfSmall <- df %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+a <- EHSummarize_StandardPlots(dfSmall, "TARGET", type="scatter")
+```
+
+Looking at boxplots, histograms, and scatterplots against the target variable for each variable in the dataset, we see some areas of interest. First, the target variable appears to be normally distributed for wines that had at least one purchase - but a large percentage of observations have zero purchases.  This suggests the need for a zero-inflated model.  Second, most of the variables exhibit the same pattern - a high peak at the mean of the distribution with long tails on either end.  Finally, AcidIndex, LabelAppeal and Stars have, by far, the highest direct correlations with TARGET. 
+
+#### B. Multicollinearity
+
+Looked at from a strictly pairwise view, there is very little mutlicollinearity in this database. This is, frankly, very surprising given pairings like "FreeSulfurDixide" and "TotalSulfurDioxide", and "FixedAcidity", "VolatileAcidity" and "Ph". If it were possible, I would definitely want to explore these findings with a chemist to understand them better and verify them.
+
+```{r}
+EHExplore_Multicollinearity(df, run_all=FALSE)
+
+
+```
+
+#### C. A preliminary exploratory model
+
+Whether we choose a poisson or negative binomial model will depend on the residuals of our poisson model.  Once we account for missing values, add columns and trasnform columns, our model will change. It is therefore a good exercise to run a poisson model at this point to get some insight into the data.
+ 
+```{r}
+
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df)  
+summary(modp)
+#halfnorm(residuals(modp)) 
+
+```
+We can see that The residual deviance falls far short of the degrees of freedom, suggesting signifcant overdispersion.  However, improvement in the model may help to account for more of the variance.  Also, we are missing almost half the data due to missing values.
+\
+\
+
+
+### 2. Data Preparation
+
+#### A. Address Missing Values
+
+We consider the missing values. 
+
+```{r}
+
+g <- EHSummarize_MissingValues(df)
+print (g[[1]])
+print(g[[3]])
+```
+
+Over half of the records have missing values. Missings are confined to 8 variables.  Interestingly, there is not a lot of overlap among the missings so we add these to the dataset.  
+
+With so many missing values, it's prudent to create flags to track what is missing. 
+
+
+```{r}
+
+df6 <- df %>%
+  mutate(STARS_NA = ifelse(is.na(STARS),1,0), Sulphates_NA = ifelse(is.na(Sulphates),1,0), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),1,0), Alcohol_NA = ifelse(is.na(Alcohol),1,0), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),1,0), Chlorides_NA = ifelse(is.na(Chlorides),1,0), ResidualSugar_NA = ifelse(is.na(ResidualSugar),1,0), pH_NA = ifelse(is.na(pH),1,0))
+
+df6Eval <- dfEval %>%
+  mutate(STARS_NA = ifelse(is.na(STARS),1,0), Sulphates_NA = ifelse(is.na(Sulphates),1,0), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),1,0), Alcohol_NA = ifelse(is.na(Alcohol),1,0), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),1,0), Chlorides_NA = ifelse(is.na(Chlorides),1,0), ResidualSugar_NA = ifelse(is.na(ResidualSugar),1,0), pH_NA = ifelse(is.na(pH),1,0))
+
+```
+We investigate the STARS missing flag, STARS_NA, further:
+
+```{r}
+
+ww <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(df6, "STARS_NA")
+grid.arrange(grobs=ww[c(1:8)], ncol=2)
+grid.arrange(grobs=ww[c(9:15)], ncol=2)
+
+
+```
+We can see how strongly Stars_na correlates with TARGET.  Wines that have no stars tend to get bought at a far lower rate than those that do.  The variance is also much higher.
+
+We can see outliers at the top of the first boxplot - this represents two wines that were bought at the highest quantity despite having missing stars.  We remove them from the analysis since they are clearly idiosyncratic anomalies. 
+
+```{r}
+
+df6a <- df6 %>%
+  dplyr::filter(STARS_NA == 0 | TARGET != 8)
+```
+
+We impute values for the NAs.  Because the most significant of them are in the STARS category, a count category from 1 to 5, we will simply impute the median.
+
+```{r, include=FALSE}
+library(mice)
+#mice1 <- mice(df6a,m=5,seed=2)
+#df7 <- complete(mice1,1) 
+
+df7 <- EHPrepare_MissingValues_Imputation(df6a, impute="median")
+df7Eval <- EHPrepare_MissingValues_Imputation(df6Eval, impute="median")
+```
+
+```{r}
+
+df7Small <- df7 %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+#write.csv(df7Small, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
+
+```
+
+#### B. Transformations and interaction terms
+
+We do a log transformation of AcidIndex (logAcidIndex) to account for the skew.  We also add two interaction terms that through analysis were discovered to be possible candidates - inter_Starsna_labelappeal and inter_stars_acidindex.
+
+```{r}
+library(MASS)
+
+df7Inter <- df7 %>%
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
+
+df7InterEval <- df7Eval %>%
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
+
+df7a <- EHPrepare_ScaleAllButTarget(df7Inter, "TARGET")
+
+df7aEval <- EHPrepare_ScaleAllButTarget(df7InterEval, "TARGET")
+```
+
+### 3. Build Models
+
+#### A. Base Model
+
+We begin with a base model - OLS on all of the variables. We create two versions - one with all variables retained, and one with backward elimination to minimize the AIC.
+
+
+```{r}
+
+OLS_all <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, xstepAIC = FALSE, returnLM=TRUE, vif=FALSE)
+
+OLS_MinimizeAIC <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, returnLM=TRUE, vif = FALSE)
+
+library(broom)
+OLS_all_results <- tidy(OLS_all)
+OLS_MinimizeAIC_Results <- tidy(OLS_MinimizeAIC)
+#write.csv(aa, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\Standard.csv")
+
+
+```
+Many of the varaibles are significant, including both our interaction terms. The AIC of the inclusive model is 42575 while the AIC maxed model is 42563.
+
+#### B. Poisson GLM Model
+
+```{r}
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df7a)  
+summary(modp)
+#halfnorm(residuals(modp)) 
+
+Poisson_results <- tidy(modp)
+#write.csv(bb, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\poisson.csv")
+```
+
+The deviance and residuals have come much closer together, close enough that we may use the poisson distribution rather than the negative binomial.  In a work situation we might want to verify that the imputed missing values have not overly artificially reduced the variance, but we will not do that here.
+
+The AIC has increased in this model.  The poisson model by itself is not a better model than the base model.
+
+#### C. Zero Inflated model
+
+Over 20% of the wines had zero cases bought, second only to 4 cases, with a 27% share of cases bought.
+
+```{r}
+
+hist(df$TARGET)
+
+```
+
+For this reason, a zero-inflated model may give us the best results.
+```{r}
+
+
+
+library(pscl)
+
+model.zi = zeroinfl(TARGET ~ .,
+                    data = df7a,
+                    dist = "poisson")
+summary(model.zi)
+
+
+print(paste("AIC: ", AIC(model.zi)))
+
+#dd <- tidy(model.zi)
+#write.csv(dd, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\zeroinf1.csv")
+```
+In this model the AIC has fallen to 40747.  This is the best model so far, even better than our optimized OLS model.
+
+#### D. Optimized Zero Inflated model
+
+We can use backward elimination to see if we can decrease our AIC.
+
+```{r}
+
+df7b <- df7a %>%
+  dplyr::select(-FixedAcidity, -ResidualSugar_NA, -Chlorides_NA, -FreeSulfurDioxide_NA, -CitricAcid, -Density, -Sulphates_NA, -Alcohol_NA,-Chlorides, -TotalSulpherDioxide_NA, -ResidualSugar)
+
+model.zi = zeroinfl(TARGET ~ .,
+                    data = df7b,
+                    dist = "poisson")
+summary(model.zi)
+
+
+print(paste("AIC: ", AIC(model.zi)))
+
+
+```
+
+Our final model has an AIC of 40716, an improvement over the unoptimized model.
+
+### 4. Select Model
+
+We choose our optimized zero-inflated poisson model, as it had the lowest AIC and makes the most common sense - it is better than OLS and standard Poisson for count data with a high proportion of zeroes.
+
+The final step is to make predictions on the evaluation set:
+
+```{r}
+
+df7aSmall <- df7a %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+makePredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=df7aEval, type="response"))
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\Assignment 5\\predictionsWine.csv")
+}
+
+a <- makePredictions(model.zi)
+
+head(a)
+
+```
+### 5. Conclusion
+
+We examined 12795 records of wine purchases to create a predictive model of how many crates of wine would be bought based on several chemical chacteristics. Our best model was a zero-inflated poisson model, using backward elimination to minimize AIC.  The analysis had first suggested a negative binomial modelwould be more appropriate, but dispersion was reduced considerable after feature engineering.
+
+A few enhancements to the model increased accuracy and lowered AIC, including a log transformation and two interaction terms. The final model perfomred considerably better than the base model.  
