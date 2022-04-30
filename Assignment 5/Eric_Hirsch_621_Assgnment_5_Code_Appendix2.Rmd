@@ -1,0 +1,228 @@
+---
+title: "Eric_Hirsch_621_Assignment_3_CODE"
+subtitle: "Predicting Wine Cases Bought" 
+author: "Eric Hirsch"
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include-FALSE}
+library(tidyverse)
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+```
+```{r}
+
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 5\\wine-evaluation-data.csv", fileEncoding="UTF-8-BOM")
+
+#df <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\wine-training-data.csv", fileEncoding="UTF-8-BOM")
+
+#dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+
+df <- df %>%
+  dplyr::select(-INDEX)
+
+dfEval <- dfEval %>%
+  dplyr::select(-IN)
+
+
+```
+
+
+```{r}
+
+summary(df)
+str(df)
+
+```
+
+
+
+```{r}
+
+dfSmall <- df %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+a <- EHSummarize_StandardPlots(dfSmall, "TARGET", type="scatter")
+```
+
+
+```{r}
+EHExplore_Multicollinearity(df, run_all=FALSE)
+
+
+```
+ 
+```{r}
+
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df)  
+summary(modp)
+#halfnorm(residuals(modp)) 
+
+```
+
+```{r}
+
+g <- EHSummarize_MissingValues(df)
+print (g[[1]])
+print(g[[3]])
+```
+
+```{r}
+
+df6 <- df %>%
+  mutate(STARS_NA = ifelse(is.na(STARS),1,0), Sulphates_NA = ifelse(is.na(Sulphates),1,0), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),1,0), Alcohol_NA = ifelse(is.na(Alcohol),1,0), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),1,0), Chlorides_NA = ifelse(is.na(Chlorides),1,0), ResidualSugar_NA = ifelse(is.na(ResidualSugar),1,0), pH_NA = ifelse(is.na(pH),1,0))
+
+df6Eval <- dfEval %>%
+  mutate(STARS_NA = ifelse(is.na(STARS),1,0), Sulphates_NA = ifelse(is.na(Sulphates),1,0), TotalSulpherDioxide_NA = ifelse(is.na(TotalSulfurDioxide),1,0), Alcohol_NA = ifelse(is.na(Alcohol),1,0), FreeSulfurDioxide_NA = ifelse(is.na(FreeSulfurDioxide),1,0), Chlorides_NA = ifelse(is.na(Chlorides),1,0), ResidualSugar_NA = ifelse(is.na(ResidualSugar),1,0), pH_NA = ifelse(is.na(pH),1,0))
+
+```
+
+
+```{r}
+
+ww <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(df6, "STARS_NA")
+grid.arrange(grobs=ww[c(1:8)], ncol=2)
+grid.arrange(grobs=ww[c(9:15)], ncol=2)
+
+
+```
+
+
+```{r}
+
+df6a <- df6 %>%
+  dplyr::filter(STARS_NA == 0 | TARGET != 8)
+```
+
+```{r, include=FALSE}
+library(mice)
+#mice1 <- mice(df6a,m=5,seed=2)
+#df7 <- complete(mice1,1) 
+
+df7 <- EHPrepare_MissingValues_Imputation(df6a, impute="median")
+df7Eval <- EHPrepare_MissingValues_Imputation(df6Eval, impute="median")
+```
+
+```{r}
+
+df7Small <- df7 %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+#write.csv(df7Small, "D:\\RStudio\\CUNY_621\\Assignment 5\\dataset.csv")
+
+```
+
+```{r}
+library(MASS)
+
+df7Inter <- df7 %>%
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
+
+df7InterEval <- df7Eval %>%
+  mutate(inter_Starsna_labelappeal = STARS_NA*LabelAppeal, inter_stars_acidindex = STARS*AcidIndex, logAcidIndex = log(AcidIndex))
+
+df7a <- EHPrepare_ScaleAllButTarget(df7Inter, "TARGET")
+
+df7aEval <- EHPrepare_ScaleAllButTarget(df7InterEval, "TARGET")
+```
+
+```{r}
+
+OLS_all <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, xstepAIC = FALSE, returnLM=TRUE, vif=FALSE)
+
+OLS_MinimizeAIC <- EHModel_Regression_StandardLM(df7a, "TARGET", splitRatio=1, tests = FALSE, xseed=10, returnLM=TRUE, vif = FALSE)
+
+library(broom)
+OLS_all_results <- tidy(OLS_all)
+OLS_MinimizeAIC_Results <- tidy(OLS_MinimizeAIC)
+#write.csv(aa, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\Standard.csv")
+
+
+```
+
+```{r}
+library(faraway)
+modp <- glm(TARGET ~., family=poisson, df7a)  
+summary(modp)
+#halfnorm(residuals(modp)) 
+
+Poisson_results <- tidy(modp)
+#write.csv(bb, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\poisson.csv")
+```
+
+
+```{r}
+
+hist(df$TARGET)
+
+```
+
+```{r}
+
+
+
+library(pscl)
+
+model.zi = zeroinfl(TARGET ~ .,
+                    data = df7a,
+                    dist = "poisson")
+summary(model.zi)
+
+
+print(paste("AIC: ", AIC(model.zi)))
+
+#dd <- tidy(model.zi)
+#write.csv(dd, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Assignment 5\\zeroinf1.csv")
+```
+
+```{r}
+
+df7b <- df7a %>%
+  dplyr::select(-FixedAcidity, -ResidualSugar_NA, -Chlorides_NA, -FreeSulfurDioxide_NA, -CitricAcid, -Density, -Sulphates_NA, -Alcohol_NA,-Chlorides, -TotalSulpherDioxide_NA, -ResidualSugar)
+
+model.zi = zeroinfl(TARGET ~ .,
+                    data = df7b,
+                    dist = "poisson")
+summary(model.zi)
+
+
+print(paste("AIC: ", AIC(model.zi)))
+
+
+```
+
+
+```{r}
+
+df7aSmall <- df7a %>%
+ dplyr::filter(row_number() %% 20 == 1)
+
+makePredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=df7aEval, type="response"))
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\Assignment 5\\predictionsWine.csv")
+}
+
+a <- makePredictions(model.zi)
+
+head(a)
+
+```
