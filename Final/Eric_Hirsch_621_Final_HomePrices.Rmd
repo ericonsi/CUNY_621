@@ -99,7 +99,7 @@ dfSmall <- df6 %>%
 
 ```{r}
 
-EHSummarize_StandardPlots(df6, "SalePrice")
+#EHSummarize_StandardPlots(df6, "SalePrice")
 
 ```
 transformations
@@ -124,7 +124,7 @@ df7 <- df6 %>%
 ```{r}
 #abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
 
-abc <- EHModel_Regression_StandardLM(df6, "SalePrice", splitRatio = 1, returnLM=TRUE)
+abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 ```
 
