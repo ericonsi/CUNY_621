@@ -114,11 +114,16 @@ EHSummarize_SingleColumn_Histograms(dfLook)
 
 ```
 
+```{r}
+hist(df6$GrLivArea)
+hist(df6$LotArea)
+hist(df6$BsmtFinSF1)
+```
 
 ```{r}
 df7 <- df6 %>%
-  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0)) %>%
-  dplyr::filter(LotArea<3000)
+  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
+  dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
 ```
 
 ```{r}
