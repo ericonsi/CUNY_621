@@ -98,9 +98,33 @@ dfSmall <- df6 %>%
 ```
 
 ```{r}
-abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
 
-#abc <- EHModel_Regression_StandardLM(df6, "SalePrice", splitRatio = 1, returnLM=TRUE)
+EHSummarize_StandardPlots(df6, "SalePrice")
+
+```
+transformations
+```{r}
+
+dfLook <- df6 %>%
+  dplyr::select(LotArea, YearBuilt, YearRemodAdd, MasVnrArea, BsmtFinSF1,X1stFlrSF, GrLivArea, GarageYrBlt, WoodDeckSF, OpenPorchSF)
+
+summary(dfLook)
+
+EHSummarize_SingleColumn_Histograms(dfLook)
+
+```
+
+
+```{r}
+df7 <- df6 %>%
+  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0)) %>%
+  dplyr::filter(LotArea>3000)
+```
+
+```{r}
+#abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
+
+abc <- EHModel_Regression_StandardLM(df6, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 ```
 
@@ -146,7 +170,7 @@ colnames(predictions) <- c("Id", "SalePrice")
 predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
 #write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
-write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictions2.csv")
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictions2.csv")
 }
 
 summary(abc$coefficients)
