@@ -86,12 +86,45 @@ dfSubmit5R  <- g[[2]]
 
 ```
 
+
+multicollinearity
+
+```{r}
+
+mult <- EHExplore_Multicollinearity( df5, run_all=TRUE, title="Wombsbat")
+```
+
+```{r}
+mult2 <- as.data.frame(mult)
+
+dfmm <- data.frame(col1=character(),
+col2=character(),
+correlation=double())
+
+
+for(i in 1:ncol(mult2)) {       # for-loop over columns
+  for(j in 1:nrow(mult2)) {
+  
+    if(mult2[i,j] >.75 & mult2[i,j] != 1){
+      v <- c(colnames(mult2[i]), colnames(mult2[j]), mult2[i,j])
+      print(paste(colnames(mult2[i]), colnames(mult2[j]), mult2[i,j]))
+      dfmm <- rbind(dfmm, v)
+    }
+  }
+}
+
+dfmm3 <- unique(dfmm)
+```
+
+
 ```{r}
 
 df6 <- na.omit(df5R)
 library(caTools)
 library(Metrics)
 df6$SalePrice <- log(df6$SalePrice)
+
+dfSubmit6 <- dfSubmit5R
 
 dfSmall <- df6 %>%
   dplyr::select(SalePrice, OverallQual, OverallCond, YearBuilt, LotArea, GrLivArea, TotRmsAbvGrd)
@@ -124,42 +157,56 @@ hist(df6$BsmtFinSF1)
 df7 <- df6 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
   dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
+
+dfSubmit7 <- dfSubmit6 %>%
+  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) 
 ```
 
 ```{r}
 #abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
 
-abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
+#abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 ```
+Now let's compare the coefficients from the ridge model with OLS:
+
 
 ```{r}
 
 library(glmnet)
-## Loading required package: Matrix
-## Loaded glmnet 4.0-2
-# Prepare glmnet input as matrix of predictors and response var as vector
-varmtx <- model.matrix(SalePrice~.-1, data=dfSmall)
-response <- dfSmall$SalePrice
-# alpha=0 means ridge regression. 
-ridge <- glmnet(scale(varmtx), response, alpha=0)
-# Cross validation to find the optimal lambda penalization
-cv.ridge <- cv.glmnet(varmtx, response, alpha=0)
-lbs_fun <- function(fit, offset_x=1, ...) {
-  L <- length(fit$lambda)
-  x <- log(fit$lambda[L])+ offset_x
-  y <- fit$beta[, L]
-  labs <- names(y)
-  text(x, y, labels=labs, ...)
-}
-plot(ridge, xvar = "lambda", label=T)
-lbs_fun(ridge)
-abline(v=cv.ridge$lambda.min, col = "red", lty=2)
-abline(v=cv.ridge$lambda.1se, col="blue", lty=2)
+
+df7a <- EHData::EHPrepare_ScaleAllButTarget(df7, "SalePrice")
+dfSubmit7a <- as.data.frame(scale(dfSubmit7))
+
+df7b <- df7a %>%
+    dplyr::select(-SalePrice)
+
+y <- df7$SalePrice
+x <- data.matrix(df7b)
+xSub <- data.matrix(dfSubmit7a)
+
+model <- glmnet(x, y, alpha = 0)
+```
+
+R makes it easy to find the best lambda by using kfold validation:
+
+```{r}
 
 
-#y.pred <- as.matrix(cbind(const=1,dfSmall)) %*% coef(ridge)
+#We find the optimal lambda by performing k-fold cross validation:
 
+mcv <- cv.glmnet(x, y, alpha = 0)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+plot(model, xvar = "lambda")
+
+
+m10 <- glmnet(x, y, alpha = 0, lambda = lambda1)
+coef(m10)
+
+y_predicted <- predict(m10, s = lambda1, newx = xSub)
 ```
 
 Now we make predictions
@@ -167,9 +214,9 @@ Now we make predictions
 
 makePredictions2 <- function(df)
 {
-predictions <- predict(df,newdata=dfSubmit5)
+predictions <- predict(df,newdata=dfSubmit7)
 predictions <- data.frame(as.vector(predictions))
-predictions$Id <- dfSubmit5$Id
+predictions$Id <- dfSubmit7$Id
 predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
 predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
@@ -178,10 +225,28 @@ predictions$SalePrice <- exp(predictions$SalePrice)
 write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictions2.csv")
 }
 
-summary(abc$coefficients)
-
-
 makePredictions2(abc)
+
+```
+
+```{r}
+
+mSubmit7 = as.matrix(dfSubmit7)
+
+
+mod=m10
+
+predictions <- predict(mod, s = lambda1, newx = xSub)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfSubmit7$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
+
+
 
 ```
 
