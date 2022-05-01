@@ -91,7 +91,10 @@ multicollinearity
 
 ```{r}
 
-mult <- EHExplore_Multicollinearity( df5, run_all=TRUE, title="Wombsbat")
+mult6 <- EHExplore_Multicollinearity(df5, printCorrs=TRUE, threshold=.90, printHeatMap=FALSE, title="Wombsbat")
+
+mult6[[2]]
+
 ```
 
 ```{r}
