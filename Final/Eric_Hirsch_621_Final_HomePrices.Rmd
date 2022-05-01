@@ -58,8 +58,8 @@ home_test1 <- home_kaggle_test %>%
 
 EHSummarize_MissingValues(home_sales1)
 
-home_sales2 <- EHPrepare_MissingValues_Imputation(home_sales1,"")
-home_test2 <- EHPrepare_MissingValues_Imputation(home_test1, "")
+home_sales2 <- EHPrepare_MissingValues_Imputation(home_sales1)
+home_test2 <- EHPrepare_MissingValues_Imputation(home_test1)
 
 ```
 
