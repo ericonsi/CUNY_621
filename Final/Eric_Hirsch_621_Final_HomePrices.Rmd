@@ -22,6 +22,7 @@ library(skimr)
 library(mltools)
 library(psych)
 library(MASS)
+library(broom)
 ```
 
 ```{r}
@@ -96,28 +97,6 @@ mult6 <- EHExplore_Multicollinearity(df5, printHighest=TRUE, threshold=.8, print
 
 ```
 
-```{r}
-mult2 <- as.data.frame(mult)
-
-dfmm <- data.frame(col1=character(),
-col2=character(),
-correlation=double())
-
-
-for(i in 1:ncol(mult2)) {       # for-loop over columns
-  for(j in 1:nrow(mult2)) {
-  
-    if(mult2[i,j] >.75 & mult2[i,j] != 1){
-      v <- c(colnames(mult2[i]), colnames(mult2[j]), mult2[i,j])
-      print(paste(colnames(mult2[i]), colnames(mult2[j]), mult2[i,j]))
-      dfmm <- rbind(dfmm, v)
-    }
-  }
-}
-
-dfmm3 <- unique(dfmm)
-```
-
 
 ```{r}
 
@@ -165,9 +144,13 @@ dfSubmit7 <- dfSubmit6 %>%
 ```
 
 ```{r}
+
+
 #abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
 
 #abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
+
+x1 <- tidy(abc)
 
 ```
 Now let's compare the coefficients from the ridge model with OLS:
@@ -204,12 +187,20 @@ lambda1 <- mcv$lambda.min
 
 plot(model, xvar = "lambda")
 
-
 m10 <- glmnet(x, y, alpha = 0, lambda = lambda1)
 coef(m10)
 
+x2 <- tidy(coef(m10))
+
 y_predicted <- predict(m10, s = lambda1, newx = xSub)
 ```
+
+```{r}
+
+x3 <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(x1, x2)
+
+```
+
 
 Now we make predictions
 ```{r}
@@ -303,7 +294,7 @@ qs[[5]]
 
 
 ```{r}
-EHSummarize_StandardPlots(abc$model, "SalePrice")
+#EHSummarize_StandardPlots(abc$model, "SalePrice")
 
 
 ```
