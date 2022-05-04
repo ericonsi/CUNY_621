@@ -26,13 +26,13 @@ library(broom)
 ```
 
 ```{r}
-home_sales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-home_kaggle_test <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-home_submit <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+#home_sales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
+#home_kaggle_test <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
+#home_submit <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
 
-#home_sales <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_kaggle_test <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_submit <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+home_sales <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
+home_kaggle_test <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
+home_submit <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
 ```
 
 ### Summary Statistics
@@ -148,11 +148,33 @@ dfSubmit7 <- dfSubmit6 %>%
 
 #abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
 
-#abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
+abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 x1 <- tidy(abc)
 
 ```
+
+```{r}
+write_csv(x1, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Final\\coeffs.csv")
+x1
+
+```
+```{r}
+
+
+dfLess <- df7 %>%
+  dplyr::select(-Id, -LandContour_Low, -Neighborhood_BrDale, -Neighborhood_ClearCr, -Neighborhood_SWISU, -HouseStyle_SLvl, -Exterior1st_CemntBd, -Exterior2nd_CmentBd, -MasVnrType_NA, -SaleType_CWD, -SaleType_Con, -SaleCondition_Partial)
+
+
+```
+
+```{r}
+
+abc_less <- EHModel_Regression_StandardLM(dfLess, "SalePrice", splitRatio = 1, returnLM=TRUE)
+
+```
+
+
 Now let's compare the coefficients from the ridge model with OLS:
 
 
@@ -214,11 +236,11 @@ predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
 predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
-#write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
-write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictions2.csv")
+write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsABCLess.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictions2.csv")
 }
 
-makePredictions2(abc)
+makePredictions2(abc_less)
 
 ```
 
