@@ -25,42 +25,49 @@ library(MASS)
 library(broom)
 ```
 
-```{r}
-#home_sales <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_kaggle_test <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-#home_submit <- read.csv("D:\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+We are modeling a data set containing 1460 records of houses sold in the Ames, Iowa area between 2006 and 2010.  The variables are mostly related to house features, such as square footage, the presense of a pool, etc. The response variable, "SalePrice", is a continuous variable representing the sale price of the house in dollars.  
 
-home_sales <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\train.csv", stringsAsFactors=TRUE, header = TRUE)
-home_kaggle_test <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\test.csv", stringsAsFactors=TRUE, header = TRUE)
-home_submit <- read.csv("C:\\Users\\eric.hirsch\\Desktop\\RStudio\\605_Final\\Final\\housing\\sample_submission.csv", header = TRUE)
+We examine the data:
+
+```{r}
+
+dfTrain <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Final/train.csv", stringsAsFactors=TRUE, header = TRUE)
+
+dfTest <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Final/test.csv", stringsAsFactors=TRUE, header = TRUE)
+
 ```
 
 ### Summary Statistics
 
 ```{r}
-summary(home_sales)
-str(home_sales)
+summary(dfTrain)
+str(dfTrain)
 ```
+The dataset consists of 1460 observations and 81 variables, some numeric and some categorical.  The target variable has a minimum of 34,950 and a maximum of 7,550,000. The low median compared to the mean suggests some skew.
+
+There are mssing values scattered throughout the database.  We analyse them:
 
 ```{r}
 
-EHSummarize_MissingValues(home_sales)
+mm <- EHSummarize_MissingValues(dfTrain)
+
+mm[[1]]
+mm[[3]]
 
 ```
 
+A few categorical features like fireplace, fence, etc. take up the bulk of missings.  They do not appear to be important enough to retain so we delete them (FireplaceQu, Fence, Alley, MiscFeature, PoolQC, and LotFrontage).  We impute the mean for the rest.  Categorical NA's will be handled when we create our dummy variables. 
+
 ```{r}
 
-# The na probably stands more for "not applicable" than missing, but we remove because these categories don't seem so important.  Actually we don't becuase they may be missing in the test set.  So we impute the mesn.
-home_sales1 <- home_sales %>%
+dfTrain1 <- dfTrain %>%
   dplyr::select(-FireplaceQu, -Fence, -Alley, -MiscFeature, -PoolQC, -LotFrontage)
 
-home_test1 <- home_kaggle_test %>%
+dfTest1 <- dfTest %>%
   dplyr::select(-FireplaceQu, -Fence, -Alley, -MiscFeature, -PoolQC, -LotFrontage)
 
-EHSummarize_MissingValues(home_sales1)
-
-home_sales2 <- EHPrepare_MissingValues_Imputation(home_sales1)
-home_test2 <- EHPrepare_MissingValues_Imputation(home_test1)
+dfTrain2 <- EHPrepare_MissingValues_Imputation(dfTrain1)
+dfTest2 <- EHPrepare_MissingValues_Imputation(dfTest1)
 
 ```
 
@@ -69,30 +76,30 @@ home_test2 <- EHPrepare_MissingValues_Imputation(home_test1)
 
 library(tidytable)
 
-fact <- home_sales2 %>%
-  dplyr::select(is.factor|is.character)
+#fact <- home_sales2 %>%
+#  dplyr::select(is.factor|is.character)
 
-df5 <- EHPrepare_CreateDummies(home_sales2)
-dfSubmit5 <- EHPrepare_CreateDummies(home_test2)
-
-```
-
-
-We Check if the dataset is missing columns from the evaluation dataset and if, so drop them from the original
-```{r}
-g <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(df5, dfSubmit5, exclude=c("SalePrice"))
-
-df5R <- g[[1]]
-dfSubmit5R  <- g[[2]]
+dfTrain3 <- EHPrepare_CreateDummies(dfTrain2)
+dfTest3 <- EHPrepare_CreateDummies(dfTest2)
 
 ```
 
 
-multicollinearity
+We Check if the dataset is missing columns from the evaluation dataset and if, so drop them from the original.
+```{r}
+g <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(dfTrain3, dfTest3, exclude=c("SalePrice"))
+
+dfTrain4 <- g[[1]]
+dfTest4  <- g[[2]]
+
+```
+
+
+We examine multicollinearity in the database  We look at all of the pairs of correlations over .8  There are 24 pairs.
 
 ```{r}
 
-mult6 <- EHExplore_Multicollinearity(df5, printHighest=TRUE, threshold=.8, printHeatMap=FALSE)
+mult6 <- EHExplore_Multicollinearity(dfTrain4, printHighest=TRUE, threshold=.8, printHeatMap=FALSE)
 
 
 ```
