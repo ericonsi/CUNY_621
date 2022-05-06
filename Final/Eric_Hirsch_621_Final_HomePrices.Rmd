@@ -1,6 +1,6 @@
 ---
-title: "Eric_Hirsch_605_Final_HomeSales"
-author: "Eric Hirsch"
+title: "605_Final_HomeSales"
+author: "Eric Hirsch and Cameron Smith"
 date: "12/13/2021"
 output: html_document
 ---
@@ -36,8 +36,9 @@ dfTrain <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Fi
 dfTest <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Final/test.csv", stringsAsFactors=TRUE, header = TRUE)
 
 ```
+### 1. Dataset Description
 
-### Summary Statistics
+#### A.  Summary Statistics
 
 ```{r}
 summary(dfTrain)
@@ -45,18 +46,27 @@ str(dfTrain)
 ```
 The dataset consists of 1460 observations and 81 variables, some numeric and some categorical.  The target variable has a minimum of 34,950 and a maximum of 7,550,000. The low median compared to the mean suggests some skew.
 
-There are mssing values scattered throughout the database.  We analyse them:
+#### B. Missing values
+
+There are missing values scattered throughout the dataset.  We analyse them:
 
 ```{r}
 
-mm <- EHSummarize_MissingValues(dfTrain)
+dfMissing <- dfTrain %>%
+  dplyr::select(which(colMeans(is.na(.)) >0))
+
+dfMissing2 <- dfTrain[rowSums(is.na(dfTrain)) > 0, ]      
+
+mm <- EHSummarize_MissingValues(dfMissing)
 
 mm[[1]]
 mm[[3]]
 
 ```
 
-A few categorical features like fireplace, fence, etc. take up the bulk of missings.  They do not appear to be important enough to retain so we delete them (FireplaceQu, Fence, Alley, MiscFeature, PoolQC, and LotFrontage).  We impute the mean for the rest.  Categorical NA's will be handled when we create our dummy variables. 
+A few categorical features like fireplace, fence, etc. take up the bulk of missings.  They do not appear to be important enough to retain so we delete them (FireplaceQu, Fence, Alley, MiscFeature, PoolQC, and LotFrontage).  We impute the mean for the rest.  
+
+
 
 ```{r}
 
@@ -72,20 +82,23 @@ dfTest2 <- EHPrepare_MissingValues_Imputation(dfTest1)
 ```
 
 
+#### C. Create dummy variables
+
+Now we create dummy variables for all of the character variables.  Categorical NA's will be handled by adding a dummy variable for NA.
+
 ```{r}
 
 library(tidytable)
-
-#fact <- home_sales2 %>%
-#  dplyr::select(is.factor|is.character)
 
 dfTrain3 <- EHPrepare_CreateDummies(dfTrain2)
 dfTest3 <- EHPrepare_CreateDummies(dfTest2)
 
 ```
 
+#### D. Reconcile training and test sets
 
-We Check if the dataset is missing columns from the evaluation dataset and if, so drop them from the original.
+We check if the dataset is missing columns from the test dataset and if so, drop them from the training set.  This way we don't risk making predictions on training set variables not found in the test set.
+
 ```{r}
 g <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(dfTrain3, dfTest3, exclude=c("SalePrice"))
 
@@ -94,6 +107,7 @@ dfTest4  <- g[[2]]
 
 ```
 
+#### E. Multicollinearity
 
 We examine multicollinearity in the database  We look at all of the pairs of correlations over .8  There are 24 pairs.
 
@@ -104,18 +118,22 @@ mult6 <- EHExplore_Multicollinearity(dfTrain4, printHighest=TRUE, threshold=.8, 
 
 ```
 
+Most of the pairs make sense - siding on the first floor will match siding on the sencond floor, the number of cars a garage can hold will be related to its area.  We will address the multicollinearity more closely when we run the analysis.
+
+### 2. Transformations
+
+#### A. Log of SalePrice
+
+The skew in the dependent variable suggests a log transformation.
 
 ```{r}
 
-df6 <- na.omit(df5R)
+dfTrain5 <- na.omit(dfTrain4)
 library(caTools)
 library(Metrics)
-df6$SalePrice <- log(df6$SalePrice)
+dfTrain5$SalePrice <- log(dfTrain5$SalePrice)
 
-dfSubmit6 <- dfSubmit5R
-
-dfSmall <- df6 %>%
-  dplyr::select(SalePrice, OverallQual, OverallCond, YearBuilt, LotArea, GrLivArea, TotRmsAbvGrd)
+dfTest5 <- dfTest4
 ```
 
 ```{r}
@@ -123,74 +141,79 @@ dfSmall <- df6 %>%
 #EHSummarize_StandardPlots(df6, "SalePrice")
 
 ```
-transformations
+
+#### B. Other transformations
+
+A number of histograms suggest issues with some of the independent variables.
+
 ```{r}
 
-dfLook <- df6 %>%
-  dplyr::select(LotArea, YearBuilt, YearRemodAdd, MasVnrArea, BsmtFinSF1,X1stFlrSF, GrLivArea, GarageYrBlt, WoodDeckSF, OpenPorchSF)
-
-summary(dfLook)
+dfLook <- dfTrain5 %>%
+  dplyr::select(LotArea, YearBuilt, YearRemodAdd, MasVnrArea, BsmtFinSF1, X1stFlrSF, GrLivArea, GarageYrBlt, WoodDeckSF, OpenPorchSF)
 
 EHSummarize_SingleColumn_Histograms(dfLook)
 
 ```
 
-```{r}
-hist(df6$GrLivArea)
-hist(df6$LotArea)
-hist(df6$BsmtFinSF1)
-```
+
+
+We can see some transformations might be useful.  We:
+1. Add a dummy variable to mark YearBuilt before and after 1920
+2. We set YearRemodAdd = 1950 to 0, and create a dummy variable YearRemodUnknown to track it
+3. We add dummies for NoFinBsmt, HasDeck, and HasPorch
+4. We eliminate outliers by setting LotArea<35000, GrLivArea3500 and BsmtFinSF1<4000
 
 ```{r}
-df7 <- df6 %>%
+dfTrain6 <- dfTrain5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
   dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
 
-dfSubmit7 <- dfSubmit6 %>%
+dfTest6 <- dfTest5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) 
 ```
 
-```{r}
+### 3. Model and Predict:
 
-
-#abc <- EHModel_Regression_StandardLM(dfSmall, "SalePrice", splitRatio = 1, returnLM = TRUE)
-
-abc <- EHModel_Regression_StandardLM(df7, "SalePrice", splitRatio = 1, returnLM=TRUE)
-
-x1 <- tidy(abc)
-
-```
+#### A. Base Model
+We run a regression using the stepAIC algorithm to minimize AIC.
 
 ```{r}
-write_csv(x1, "C:\\Users\\eric.hirsch\\Desktop\\RStudio\\CUNY_621\\Final\\coeffs.csv")
-x1
 
-```
-```{r}
-
-
-dfLess <- df7 %>%
-  dplyr::select(-Id, -LandContour_Low, -Neighborhood_BrDale, -Neighborhood_ClearCr, -Neighborhood_SWISU, -HouseStyle_SLvl, -Exterior1st_CemntBd, -Exterior2nd_CmentBd, -MasVnrType_NA, -SaleType_CWD, -SaleType_Con, -SaleCondition_Partial)
+abc <- EHModel_Regression_StandardLM(dfTrain6, "SalePrice", splitRatio = 1, returnLM=TRUE)
 
 
 ```
 
+
+Now we make predictions
 ```{r}
 
-abc_less <- EHModel_Regression_StandardLM(dfLess, "SalePrice", splitRatio = 1, returnLM=TRUE)
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsABCLess.csv")
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(abc)
 
 ```
+We achieve a score of .14586 on kaggle.
 
-
-Now let's compare the coefficients from the ridge model with OLS:
-
+#### B. Now we try Ridge regression:
 
 ```{r}
 
 library(glmnet)
 
-df7a <- EHData::EHPrepare_ScaleAllButTarget(df7, "SalePrice")
-dfSubmit7a <- as.data.frame(scale(dfSubmit7))
+df7a <- EHData::EHPrepare_ScaleAllButTarget(dfTrain6, "SalePrice")
+dfSubmit7a <- as.data.frame(scale(dfTest6))
 
 df7b <- df7a %>%
     dplyr::select(-SalePrice)
@@ -224,38 +247,12 @@ x2 <- tidy(coef(m10))
 y_predicted <- predict(m10, s = lambda1, newx = xSub)
 ```
 
-```{r}
+We predict values based on our Ridge regressions.  
 
-x3 <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(x1, x2)
-
-```
-
-
-Now we make predictions
-```{r}
-
-makePredictions2 <- function(df)
-{
-predictions <- predict(df,newdata=dfSubmit7)
-predictions <- data.frame(as.vector(predictions))
-predictions$Id <- dfSubmit7$Id
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
-predictions$SalePrice <- exp(predictions$SalePrice)
-write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsABCLess.csv")
-#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictions2.csv")
-}
-
-makePredictions2(abc_less)
-
-```
 
 ```{r}
 
 mSubmit7 = as.matrix(dfSubmit7)
-
-
 mod=m10
 
 predictions <- predict(mod, s = lambda1, newx = xSub)
@@ -265,515 +262,8 @@ predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
 predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
-#write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
 write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
 
-
-
 ```
 
-```{r}
-library(glmnet)
-## Loading required package: Matrix
-## Loaded glmnet 4.0-2
-# Prepare glmnet input as matrix of predictors and response var as vector
-varmtx <- model.matrix(attacks~.-1, data=dat)
-response <- dat$attacks
-# alpha=0 means ridge regression. 
-ridge <- glmnet(scale(varmtx), response, alpha=0)
-# Cross validation to find the optimal lambda penalization
-cv.ridge <- cv.glmnet(varmtx, response, alpha=0)
-lbs_fun <- function(fit, offset_x=1, ...) {
-  L <- length(fit$lambda)
-  x <- log(fit$lambda[L])+ offset_x
-  y <- fit$beta[, L]
-  labs <- names(y)
-  text(x, y, labels=labs, ...)
-}
-plot(ridge, xvar = "lambda", label=T)
-lbs_fun(ridge)
-abline(v=cv.ridge$lambda.min, col = "red", lty=2)
-abline(v=cv.ridge$lambda.1se, col="blue", lty=2)
-
-
-```
-
-
-```{r}
-
-dfN <- df5R %>%
-    dplyr::select(SalePrice, starts_with('Neighborhood'))
-
-EHModel_Regression_StandardLM(dfN, "SalePrice", splitRatio = 1)
-
-
-```
-
-```{r}
-library(ggsci)
-qs <- EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfN, "SalePrice", yCategorical = FALSE)
-
-qs[[5]]
-
-#grid.arrange(grobs = qs[c(1:16)], ncol=4)
-#grid.arrange(grobs = qs[c(17:25)], ncol=4)
-
-
-```
-
-
-```{r}
-#EHSummarize_StandardPlots(abc$model, "SalePrice")
-
-
-```
-
-
-```{r}
-library(tibble)
-home_sales_num <- home_sales %>% select_if(is.numeric)
-dfCorr <- as.data.frame(cor(home_sales_num, home_sales_num$SalePrice)) %>%
-  tibble::rownames_to_column("Variables") %>% 
-  arrange(desc(abs(V1)))
-
-head(dfCorr, 10)
-
-```
-
-
-```{r}
-dfSelectedCols <- home_sales %>%
-  dplyr::select(SalePrice, OverallQual, GrLivArea, GarageCars, GarageArea, TotalBsmtSF, X1stFlrSF, FullBath, TotRmsAbvGrd, YearBuilt)
-
-library(ResourceSelection)
-kdepairs(dfSelectedCols)
-```
-Here we can see that there is significant multicollinearity among the variables.  Also, many are skewed right (meaning the distributiion is mainly to the left of the mean.)
-
-#### 1b. Provide a scatterplot matrix for at least two of the independent variables and the dependent variable. 
-
-```{r}
-ggplot(home_sales, aes(y=SalePrice, x=GrLivArea, color = X1stFlrSF)) +
-  geom_point() +
-    stat_smooth(method = "lm", se = FALSE)
-
-ggplot(home_sales, aes(y=SalePrice, x=GarageArea)) +
-  geom_point() +
-    stat_smooth(method = "lm", se = FALSE)
-
-```
-
-Here we can see that GrLivArea, X1stFlrSF and GarageArea are all correlated with SalePrice. However, they show cone-shaped patterns which might suggest issues with heteroskedasticity, since there is more variation as values get larger.
-
-#### 1c. Derive a correlation matrix for any three quantitative variables in the dataset. Test the hypotheses that the correlations between each pairwise set of variables is 0 and provide an 80% confidence interval. Discuss the meaning of your analysis. Would you be worried about familywise error? Why or why not? 5 point
-
-```{r}
-dfSelectedCols2 <- home_sales %>%
-  dplyr::select(X1stFlrSF, GrLivArea, YearBuilt)
-
-corMat <- cor(dfSelectedCols2)
-corMat
-```
-Here we see that all of the variables are correlated but particularly X1sFlrSF and GrLivArea.  Looking at the p values:  
-
-```{r}
-
-library(Hmisc)
-res <- rcorr(as.matrix(dfSelectedCols2)) 
-round(res$P, 3)
-
-```
-
-p values are near zero.  Given the level of correlation among these variables, this is not surprising.
-
-The three CIs:
-
-1). confidence interval X1stFlrSF vs GrLivArea
-
-```{r}
-ct = cor.test(dfSelectedCols2$X1stFlrSF, dfSelectedCols2$GrLivArea, method="pearson", conf.level=.8)
-
-ct$conf.int[1:2]  
-```
-2). confidence interval X1stFlrSF vs YearBuilt
-```{r}
-
-ct = cor.test(dfSelectedCols2$X1stFlrSF,dfSelectedCols2$YearBuilt, method="pearson", conf.level=.8)
-
-ct$conf.int[1:2]  
-
-```
-3). confidence interval GeLivArea vs YearBuilt
-
-```{r}
-ct = cor.test(dfSelectedCols2$GrLivArea,dfSelectedCols2$YearBuilt, method="pearson", conf.level=.8)
-
-ct$conf.int[1:2]  
-
-```
-
-Same CI as above but with .95 confidence interval
-
-```{r}
-ct = cor.test(dfSelectedCols2$GrLivArea,dfSelectedCols2$YearBuilt, method="pearson", conf.level=.95)
-
-ct$conf.int[1:2]  
-
-```
-
-
-Confidence intervals are about .05 to .07 wide. We can see they increase at .95 confidence but not by much.  
-
-Family-wise error:The Family-wise error rate = $$1 – (1-α)^n$$ where 
-α: The significance level for a single hypothesis test
-n: The total number of tests
-
-```{r}
-alpha=.2
-num=3
-fwe <- 1 - (1-alpha)^num
-fwe
-```
-The probability of getting a type I error on at least one of the hypothesis tests is nearly 50% so I would be concerned about family-wise error.
-
-The point here is that with so mnay variables and so much correlation, we should be soemwhat skeptical that all of our findings hold true.
-
-#### 2. Invert your correlation matrix from above. (This is known as the precision matrix and contains variance inflation factors on the diagonal.) Multiply the correlation matrix by the precision matrix, and then multiply the precision matrix by the correlation matrix. Conduct LU decomposition on the matrix. 5 points
-
-
-```{r}
-precMat <- solve(corMat)
-precMat
-```
-
-Surprisingly, the VIFs are not too high.
-
-```{r}
-
-cByp <- corMat %*% precMat
-pByc <- precMat %*% corMat
-
-library(matrixcalc)
-cByp_LU <- lu.decomposition(cByp)
-pByc_LU <- lu.decomposition(pByc)
-
-print(cByp_LU)
-print(pByc_LU)
-```
-
-#### 3a. Select a variable in the Kaggle.com training dataset that is skewed to the right, shift it so that the minimum value is absolutely above zero if necessary. Then load the MASS package and run fitdistr to fit an exponential probability density function. 
-
-I will be using SalePrice, which we know is skewed from the analysis at the beginning of the exercise.
-
-```{r}
-hist(home_sales$SalePrice)
-```
-
-#### 3.b Find the optimal value of λ for this distribution, and then take 1000 samples from this exponential distribution using this value (e.g., rexp(1000, λ)).
-
-We fit an exponential pdf, find the optimal lamda, and take 1000 samples.
-```{r}
-
-library(MASS)
-
-fit1 <- fitdistr(home_sales$SalePrice, "exponential")
-fit1
-```
-```{r}
-set.seed(1)
-simdata = rexp(n = 1000, rate = fit1$estimate )
-matrixdata =  matrix(simdata, nrow = 1000)
-means.exp = apply(matrixdata, 1, mean)
-```
-
-#### 3.c Plot a histogram and compare it with a histogram of your original variable. Using the exponential pdf, find the 5th and 95th percentiles using the cumulative distribution function (CDF). Also generate a 95% confidence interval from the empirical data, assuming normality. Finally, provide the empirical 5th percentile and 95th percentile of the data. Discuss. 10 points
-
-```{r}
-par(mfcol=c(1,2), mar=c(1,1,2,1))
-
-hist(home_sales$SalePrice)
-hist(means.exp)
-
-```
-
-Quantiles for the generated distribution
-
-```{r}
-lambda <- 5.527268e-06
-prob <- 0.05
-# compute the quantile for Exponential dist
-qexp(prob,rate=lambda)
-```
-```{r}
-prob <- 0.95
-# compute the quantile for Exponential dist
-qexp(prob,rate=lambda)
-```
-
-Confidence interval for the mean of the empirical distribution, assuming normality
-
-```{r}
-
-t.test(home_sales$SalePrice)
-
-```
-Quantiles for the empirical distribution
-
-```{r}
-
-quantile(home_sales$SalePrice, probs = c(0.05, 0.95))
-```
-We can see how close the generated function is to the actual distribution for SalePrice from the histograms. The quantiles show some differences, however. Quantiles for the generated distribution (9280, 541991) are wider than those for the empirical distribution (88000,326100).  This is perhaps picking up the fact that the empirical distribution is more normal than the generated distribution, in that there are a number of observations before the distribution peaks. The empirical mean CI (176k to 185k) is far closer to the 5th than the 95th quantile - this shows us the skew of the distribution.
-
-## PART II Kaggle
-
-Modeling. Build some type of multiple regression model and submit your model to the competition board. Provide your complete model summary and results with analysis. Report your Kaggle.com user name and score. 10 points
-
-#### Data Wrangling
-
-If we were to follow best practices, we would 1) do more investigation of the clear mulitcollinearity in the database, 2) work with all of the variables until we found the best fit, 3) find the optimal strategy for working with NAs, and 3) transform independent variables where necessary.  
-
-We will do a modified version of that here. We may lose information but it makes the scope of the project possible.  Specifically, we will 1) eliminate all records with Na, 2) scale the numeric variables, 3) eliminate unbalanced character variables (and one-hot the rest), 4) take the log of the sale price, and 5) choose the numeric and categorical variables that most correlate with the dependent variable, accounting for common sense evaluation of multicollinearity.
-
-a. Get rid of columns that have na
-
-We would normally investigate whether valuable data would be lost with this step - however, we can see from the above that most variables are preserved and in the interests of time will proceed.
-```{r}
-
-home_sales2 <- home_sales %>%
-  dplyr::select_if(~ !any(is.na(.)))
-
-```
-
-b. Remove utilities because it only has one value and ID because it is irrelevant
-
-```{r}
-
-home_sales3 <- home_sales2 %>%
-  dplyr::select(-Utilities) %>%
-  dplyr::select(-Id)
-
-```
-
-c. Scale the numeric variables.
-
-```{r}
-numeric_data <- home_sales3 %>% select_if(is.numeric)
-nonnumeric_data <- home_sales3 %>% select_if(Negate(is.numeric))
-
-df.scaled <- as.data.frame(scale(numeric_data))
-df.scaled$SalePrice <- numeric_data$SalePrice
-
-```
-
-d. Eliminate unbalanced character variables and then one-hot
-
-```{r}
-nonnumeric_data2 <- nonnumeric_data %>%
-  dplyr::select(ExterQual, Exterior1st, HouseStyle, Neighborhood, LotConfig, LotShape, KitchenQual, HeatingQC, Foundation)
-
-nonnumeric_data3 <- one_hot(as.data.table(nonnumeric_data2), dropCols=TRUE)
-
-home_sales4 <- cbind(nonnumeric_data3, df.scaled)
-```
-
-d. Take the log of SalePrice - based on the analysis above, the analysis would benefit from this
-
-```{r}
-home_sales_wrangled <- home_sales4 %>%
-  mutate(SalePrice = log(SalePrice)) 
-```
-
-#### Choosing variables for a base model
-
-We don't want to choose all of the variables as this would inevitably lead to multicollinearity, reduction in adjusted R squared and serious overfitting.  
-
-```{r}
-
-head(dfCorr, 20)
-
-```
-Based on this analysis, we'll start with the following numeric variables and then add some categorical variable.  We choose based on correlation with some attention to avoiding collineararity with other obvious variables (e.g. garage area and garage cars):
-
-
-```{r}
-
-mod_1 <- lm(SalePrice ~ LotArea + YearBuilt + YearRemodAdd + TotalBsmtSF + X1stFlrSF + GrLivArea + GarageCars + WoodDeckSF + OpenPorchSF + TotRmsAbvGrd + Fireplaces + FullBath, data = home_sales_wrangled)
-summary(mod_1)
-
-```
-
-We do the same analysis with categorical variables.
-
-```{r}
-nonnumeric_data4 <- cbind(nonnumeric_data3, df.scaled$SalePrice)
-
-dfCorr_cat <- as.data.frame(cor(nonnumeric_data4, nonnumeric_data4$V2)) %>%
-  tibble::rownames_to_column("Variables") %>% 
-  arrange(desc(abs(V1)))
-head(dfCorr_cat, 20)
-
-```
-
-Our New model 
-```{r}
-
-home_sales_wrangled_Final <- home_sales_wrangled %>%
-  dplyr::select(SalePrice, LotArea, YearBuilt, YearRemodAdd, TotalBsmtSF, X1stFlrSF, GrLivArea, GarageCars, WoodDeckSF, OpenPorchSF, TotRmsAbvGrd, Fireplaces, FullBath, -LotConfig_Corner:LotConfig_Inside, LotShape_IR1:LotShape_Reg)
-
-
-mod_2 <- lm(SalePrice ~ ., data = home_sales_wrangled_Final)
-summary(mod_2)
-```
-We now step through the model to see the effect on adjusted R squared of eliminating variables.  We do this with the R Step_AIC function.
-
-```{r}
-library(MASS)
-step1 <- stepAIC(mod_2, trace=FALSE)
-summary(step1)
-
-```
-```{r}
-plot(step1)
-```
-
-
-Thus our new df:
-
-```{r}
-
-dfFinal <- step1$model
-head(dfFinal)
-
-```
-
-We Load test data and prepare as we did the training data
-
-```{r}
-
-numeric_data_test <- home_kaggle_test %>% select_if(is.numeric)
-nonnumeric_data_test <- home_kaggle_test %>% select_if(Negate(is.numeric))
-
-#1. one-hot the categorical variables
-
-nonnumeric_data_test1 <- nonnumeric_data_test %>%
-  dplyr::select(ExterQual, Exterior1st, HouseStyle, Neighborhood, KitchenQual, HeatingQC, Foundation)
-
-nonnumeric_data_OneHot <- one_hot(as.data.table(nonnumeric_data_test1), dropCols=TRUE)
-
-#Scale the numeric variables
-
-df.scaled_test <- as.data.frame(scale(numeric_data_test))
-df.scaled_test$Id <- numeric_data_test$Id
-
-#recombine
-
-dfTest_Final <- cbind(df.scaled_test, nonnumeric_data_OneHot)
-```
-
-We Check if the dataset is missing columns from the test dataset and if, so drop them from the original
-```{r}
-
-library(janitor)
-compare_df_cols(dfTest_Final, dfFinal)
-
-dfFinal1 <- dfFinal %>%
-  dplyr::select(-LotConfig_CulDSac) %>%
-  dplyr::select(-LotConfig_FR2)  %>%
-  dplyr::select(-LotShape_IR3)
-  
-```
-
-We Run the model
-
-```{r}
-
-mod_3 <- lm(SalePrice ~ ., data = dfFinal1)
-step2 <- stepAIC(mod_3, trace=FALSE)
-summary(step2)
-```
-
-We examine the residual plots.  
-
-```{r}
-par(mfcol=c(2,2))
-plot(step2)
-
-```
-The residuals are relatively normally-distributed, though there are some outliers.  Heteroskedasticity is present but minimal.  
-
-Now we make predictions
-```{r}
-
-makePredictions <- function(df)
-{
-predictions <- predict(df,newdata=dfTest_Final)
-predictions <- data.frame(as.vector(predictions))
-predictions$Id <- dfTest_Final$Id
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
-predictions$SalePrice <- exp(predictions$SalePrice)
-write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictions.csv")
-}
-
-makePredictions(step2)
-
-```
-
-Now we make predictions
-```{r}
-
-makePredictions2 <- function(df)
-{
-predictions <- predict(df,newdata=dfSubmit5)
-predictions <- data.frame(as.vector(predictions))
-predictions$Id <- dfTest_Final$Id
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
-predictions$SalePrice <- exp(predictions$SalePrice)
-write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictions2.csv")
-}
-
-summary(abc$coefficients)
-
-
-makePredictions2(abc)
-
-```
-
-Our score is .1693
-
-Remove outliers
-
-```{r}
-dfFinal2 <- slice(dfFinal1, -1299)
-dfFinal2 <- slice(dfFinal2, -524)
-dfFinal2 <- slice(dfFinal2, -1001)
-```
-
-```{r}
-
-mod_4 <- lm(SalePrice ~ ., data = dfFinal2)
-step3 <- stepAIC(mod_4, trace=FALSE)
-print(summary(step3)$adj.r.squared)
-```
-We remove outliers and the R squared improves.We submit this new model:
-
-```{r}
-
-makePredictions(step3)
-
-```
-
-Our score (.16984) is not an improvement.  My username is Eric Hirsch.
-
-Therefore we stick with our first model.
-
-  ![](kaggle.png)
-
-
-### Conclusion
-
-As stated above, we can probably impoove this score with the following:  1) do more investigation of the clear mulitcollinearity in the database, 2) work with all of the variables until we found the best fit, 3) find the optimal strategy for working with NAs, and 3) transforming independent variables where necessary.  
+Ridge regression performs the best, with a score of .14047.  This puts us at 1690 out of 4216 individuals.
