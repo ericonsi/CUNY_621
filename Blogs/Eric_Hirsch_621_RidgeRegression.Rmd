@@ -26,7 +26,7 @@ library(glmnet)
 
 *__Why do we need another regression procedure? What is the problem with OLS?__*
 
-Ordinary Least Squares (OLS) is often the most reliable regression procedure to predict targets on unseen data. But this isn’t always the case.   if the model has a high degree of outliers or strong multicollinearity then the high variance within the model caused by these factors can become a problem. One of the possible unwanted results is *__overfitting__*. 
+Ordinary Least Squares (OLS) is often the most reliable regression procedure to predict targets on unseen data. But this isn’t always the case.  If the model has a high degree of outliers or strong multicollinearity then the high variance within the model caused by these factors can become a problem. One of the possible unwanted results is *__overfitting__*. 
 
 *__What is overfitting?__*
 
