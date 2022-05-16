@@ -185,7 +185,8 @@ We can see some transformations might be useful.  We:
 ```{r}
 dfTrain6 <- dfTrain5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
-  dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
+  #dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
+  dplyr::filter(GrLivArea<4000)
 
 dfTest6 <- dfTest5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) 
@@ -214,7 +215,7 @@ predictions <- data.frame(as.vector(predictions))
 predictions$Id <- dfTest6$Id
 predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions[is.na(predictions)] <- log(mean(dfTrain6$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
 #write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsABCLess.csv")
 write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
@@ -281,6 +282,7 @@ predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
 predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
+write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsRidge.csv")
 #write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
 
 ```
