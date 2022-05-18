@@ -1,8 +1,11 @@
 ---
 title: "605_Final_HomeSales"
-author: "Eric Hirsch and Cameron Smith"
-date: "12/13/2021"
-output: html_document
+author: "Eric Hirsch, Cameron Smith and Carlisle Fergusen"
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
 ---
 
 ```{r setup, include=FALSE, warning=FALSE}
@@ -24,6 +27,23 @@ library(psych)
 library(MASS)
 library(broom)
 ```
+
+## *Introduction*
+
+In this paper we analyze housing prices by comparing three prediction methodologies: OLS, Ridge regression, and Random Forest. The purpose is to compare the methodologies and draw conclusions about which are most effective and why. Regression alone is not necessarily the optimal strategy for predicting housing prices.^[1]  However, when data sets and/or analysis resources are limited, regression can perform adequately.
+
+## *Background and Literature Review*
+
+The ability to accurately predict home prices is of tremendous value to a number of industries, including investors, real estate agents, and municipalities who depend upon property tax revenue. ¹ Predictive models for home prices fall roughly into two kinds.  First, there are those which predict market trends, busts, and booms.  These predictions rely mainly on timeseries data and analysis of housing prices in the aggregate.  The other type of prediction involves the capacity to predict individual house prices from a set of factors.  These usually employ some form of regression and/or machine learning.^[2]
+
+For either sort of prediction, there is no consensus about the best method.  Many researchers have sought to enhance the traditional models with other methodologies.^[3]  For example, Guan et. al. propose a “data stream” approach in which past sale records are treated as an evolving datastream.^[4]   Li et. al. introduce a “grey seasonal model” in which seasonal fluctuations are modeled using grey systems theory, which incorporates uncertainty.^[5]  Alfiyatin, et. el. use particle swarm optimization (PSO) to select independent variables.^[6]  (PSO is an optimization system in which population is initialized with random solutions and searches for optima by updating generations.)  Finally, Liu et.al incorporate both spatial and temporal autocorrelation in their models by analyzing experience-based submarkets by real estate professionals.^[7]
+
+All of these researchers report that their innovations improve their regression models. Indeed, any real estate agent can tell you that a predictive model can be improved simply by knowing what other houses in the neighborhood sold for.  The problem is, the data at the center of these enhancements is not always available. The researcher may have home sales from only a short time span, and neighborhoods that are not defined by real estate experts but by traditional boundary lines which may contain a mix of house types.  Even when data is available, the complex models proposed may be computationally expensive and/or require data analysis expertise that is not generally available.
+
+In this project we approach the question comparatively. Restricting ourselves to regression models, we compare three types of regression: OLS, Ridge, and Random Forest. At the data is drawn from the Advanced Regression Techniques housing data set for Ames, Iowa. We test the accuracy of our models by submitting each to the Kaggle competition to see how they perform.  We then discussed the merits of the different sorts of approaches.
+
+
+## *Modeling*
 
 We are modeling a data set containing 1460 records of houses sold in the Ames, Iowa area between 2006 and 2010.  The variables are mostly related to house features, such as square footage, the presense of a pool, etc. The response variable, "SalePrice", is a continuous variable representing the sale price of the house in dollars.  
 
@@ -156,7 +176,6 @@ EHSummarize_SingleColumn_Histograms(dfLook)
 ```
 
 
-
 We can see some transformations might be useful.  We:
 1. Add a dummy variable to mark YearBuilt before and after 1920
 2. We set YearRemodAdd = 1950 to 0, and create a dummy variable YearRemodUnknown to track it
@@ -166,7 +185,8 @@ We can see some transformations might be useful.  We:
 ```{r}
 dfTrain6 <- dfTrain5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
-  dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
+  #dplyr::filter(LotArea<35000, GrLivArea<3500, BsmtFinSF1<4000)
+  dplyr::filter(GrLivArea<4000)
 
 dfTest6 <- dfTest5 %>%
   dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) 
@@ -179,8 +199,8 @@ We run a regression using the stepAIC algorithm to minimize AIC.
 
 ```{r}
 
-abc <- EHModel_Regression_StandardLM(dfTrain6, "SalePrice", splitRatio = 1, returnLM=TRUE)
-
+#abc <- EHModel_Regression_StandardLM(dfTrain6, "SalePrice", splitRatio = 1, returnLM=TRUE)
+abc <- lm(SalePrice ~ GrLivArea, dfTrain6)
 
 ```
 
@@ -195,13 +215,13 @@ predictions <- data.frame(as.vector(predictions))
 predictions$Id <- dfTest6$Id
 predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions[is.na(predictions)] <- log(mean(dfTrain6$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
 #write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsABCLess.csv")
 write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
 }
 
-makePredictions2(abc)
+#makePredictions2(abc)
 
 ```
 We achieve a score of .14586 on kaggle.
@@ -218,7 +238,7 @@ dfSubmit7a <- as.data.frame(scale(dfTest6))
 df7b <- df7a %>%
     dplyr::select(-SalePrice)
 
-y <- df7$SalePrice
+y <- df7a$SalePrice
 x <- data.matrix(df7b)
 xSub <- data.matrix(dfSubmit7a)
 
@@ -252,18 +272,89 @@ We predict values based on our Ridge regressions.
 
 ```{r}
 
-mSubmit7 = as.matrix(dfSubmit7)
+mSubmit7 = as.matrix(dfSubmit7a)
 mod=m10
 
 predictions <- predict(mod, s = lambda1, newx = xSub)
 predictions <- data.frame(as.vector(predictions))
-predictions$Id <- dfSubmit7$Id
+predictions$Id <- dfTest6$Id
 predictions[,c(1,2)] <- predictions[,c(2,1)]
 colnames(predictions) <- c("Id", "SalePrice")
-predictions[is.na(predictions)] <- log(mean(home_sales$SalePrice))
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
 predictions$SalePrice <- exp(predictions$SalePrice)
-write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
+write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsRidge.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
 
 ```
 
 Ridge regression performs the best, with a score of .14047.  This puts us at 1690 out of 4216 individuals.
+
+
+New code goes here:
+THE CLEAN DATASET IS dfTrain6, not df7!  The test set (for submission) is dfTest6.  
+
+```{r}
+library(gbm)
+Boston.boost=gbm(SalePrice ~ . ,data = dfTrain6, distribution = "gaussian",n.trees = 10000,
+                  shrinkage = 0.01, interaction.depth = 4)
+Boston.boost
+
+summary(Boston.boost) #Summary gives a table of Variable Importance and a plot of Variable Importance
+
+```
+
+```{r}
+
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsBoost.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(Boston.boost)
+
+```
+
+```{r}
+library(randomForest)
+
+# Create the forest.
+output.forest <- randomForest(SalePrice ~ ., 
+           data = dfTrain6)
+
+# View the forest results.
+print(output.forest) 
+
+# Importance of each predictor.
+#print(importance(fit,type = 2)) 
+
+
+```
+```{r}
+
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+write_csv(predictions, "C:\\Users\\eric.hirsch\\Desktop\\predictionsForest.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(output.forest)
+
+```
+
