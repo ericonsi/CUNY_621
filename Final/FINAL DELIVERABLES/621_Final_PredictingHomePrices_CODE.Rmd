@@ -1,0 +1,419 @@
+---
+title: "Comparing Models for the Prediction of Home Prices"
+author: "Eric Hirsch, Carlisle Ferguson, and Cameron Smith"
+date: "5/15/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+header-includes:
+    - \usepackage{setspace}\doublespacing
+---
+
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include=FALSE}
+# Load libraries
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(data.table)
+library(tidymodels)
+library(vip)
+library(tidyverse)
+library(lmtest)
+library(skimr)
+library(mltools)
+library(psych)
+library(MASS)
+library(broom)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+
+dfTrain <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Final/train.csv", stringsAsFactors=TRUE, header = TRUE)
+
+dfTest <- read.csv("https://raw.githubusercontent.com/ericonsi/CUNY_621/main/Final/test.csv", stringsAsFactors=TRUE, header = TRUE)
+
+```
+
+```{r}
+summary(dfTrain)
+str(dfTrain)
+```
+The dataset consists of 1460 observations and 81 variables, some numeric and some categorical.  The target variable has a minimum of 34,950 and a maximum of 7,550,000. The low median compared to the mean suggests some skew.
+
+#### B. Missing values
+
+There are missing values scattered throughout the dataset.  We analyse them:
+
+```{r}
+
+dfMissing <- dfTrain %>%
+  dplyr::select(which(colMeans(is.na(.)) >0))
+
+dfMissing2 <- dfTrain[rowSums(is.na(dfTrain)) > 0, ]      
+
+mm <- EHSummarize_MissingValues(dfMissing)
+
+mm[[1]]
+mm[[3]]
+
+```
+
+```{r}
+
+dfTrain1 <- dfTrain %>%
+  dplyr::select(-FireplaceQu, -Fence, -Alley, -MiscFeature, -PoolQC, -LotFrontage)
+
+dfTest1 <- dfTest %>%
+  dplyr::select(-FireplaceQu, -Fence, -Alley, -MiscFeature, -PoolQC, -LotFrontage)
+
+dfTrain2 <- EHPrepare_MissingValues_Imputation(dfTrain1)
+dfTest2 <- EHPrepare_MissingValues_Imputation(dfTest1)
+
+```
+
+```{r}
+
+library(tidytable)
+
+dfTrain3 <- EHPrepare_CreateDummies(dfTrain2)
+dfTest3 <- EHPrepare_CreateDummies(dfTest2)
+
+```
+
+```{r}
+g <- EHPrepare_RestrictDataFrameColumnsToThoseInCommon(dfTrain3, dfTest3, exclude=c("SalePrice"))
+
+dfTrain4 <- g[[1]]
+dfTest4  <- g[[2]]
+
+```
+
+```{r}
+
+mult6 <- EHExplore_Multicollinearity(dfTrain4, printHighest=TRUE, threshold=.8, printHeatMap=FALSE)
+
+
+```
+
+```{r}
+
+dfTrain5 <- na.omit(dfTrain4)
+library(caTools)
+library(Metrics)
+dfTrain5$SalePrice <- log(dfTrain5$SalePrice)
+
+dfTest5 <- dfTest4
+```
+
+```{r}
+
+#EHSummarize_StandardPlots(df6, "SalePrice")
+
+```
+
+```{r}
+
+dfLook <- dfTrain5 %>%
+  dplyr::select(LotArea, YearBuilt, YearRemodAdd, MasVnrArea, BsmtFinSF1, X1stFlrSF, GrLivArea, GarageYrBlt, WoodDeckSF, OpenPorchSF)
+
+qq <- EHSummarize_SingleColumn_Histograms(dfLook)
+grid.arrange(grobs=qq[c(1:10)], ncol=5)
+
+```
+
+```{r}
+dfTrain6 <- dfTrain5 %>%
+  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0)) %>%
+  dplyr::filter(GrLivArea<4000)
+
+dfTest6 <- dfTest5 %>%
+  dplyr::mutate(BuiltAfter1920 = ifelse(YearBuilt>1920,1,0), YearRemodUnknown = ifelse(YearRemodAdd==1950,1,0), NoFinBsmt = ifelse(BsmtFinSF1==0,1,0), YearRemodAdd = ifelse(YearRemodAdd==1950,0,YearRemodAdd), HasDeck = ifelse(WoodDeckSF!=0,1,0), HasPorch = ifelse(OpenPorchSF!=0,1,0))
+```
+
+```{r}
+
+abc <- EHModel_Regression_StandardLM(dfTrain6, "SalePrice", splitRatio = 1, returnLM=TRUE, xseed=10)
+#abc <- lm(SalePrice ~ GrLivArea, dfTrain6)
+summary(abc)
+
+```
+
+```{r}
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictionsABCLess.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(abc)
+
+```
+
+```{r}
+
+library(glmnet)
+
+df7a <- EHData::EHPrepare_ScaleAllButTarget(dfTrain6, "SalePrice")
+dfSubmit7a <- as.data.frame(scale(dfTest6))
+
+df7b <- df7a %>%
+    dplyr::select(-SalePrice)
+
+y <- df7a$SalePrice
+x <- data.matrix(df7b)
+xSub <- data.matrix(dfSubmit7a)
+
+model <- glmnet(x, y, alpha = 0)
+```
+
+```{r}
+
+
+#We find the optimal lambda by performing k-fold cross validation:
+
+mcv <- cv.glmnet(x, y, alpha = 0)
+plot(mcv)
+
+lambda1 <- mcv$lambda.min
+
+plot(model, xvar = "lambda")
+
+m10 <- glmnet(x, y, alpha = 0, lambda = lambda1)
+coef(m10)
+
+x2 <- tidy(coef(m10))
+
+y_predicted <- predict(m10, s = lambda1, newx = xSub)
+```
+
+```{r}
+
+mSubmit7 = as.matrix(dfSubmit7a)
+mod=m10
+
+predictions <- predict(mod, s = lambda1, newx = xSub)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsRidge2.csv")
+
+```
+
+```{r}
+y_train <- dfTrain6$SalePrice
+x_train <- data.matrix(dfTrain6[, names(dfTrain6) != "SalePrice"])
+```
+
+```{r, include=FALSE}
+lasso_cv <- cv.glmnet(x_train, y_train, alpha = 1)
+
+lasso_lambda <- lasso_cv$lambda.min; lasso_lambda
+```
+
+```{r, include=FALSE}
+optimized_lasso <- glmnet(x_train, y_train, alpha = 1, lambda = lasso_lambda)
+```
+
+```{r, include=FALSE}
+lasso_testdata <- data.matrix(dfTest6)
+```
+
+```{r, include=FALSE}
+y_pred_lasso <- predict(optimized_lasso, s = lasso_lambda, newx = lasso_testdata)
+y_pred_lasso <- data.frame(as.vector(y_pred_lasso))
+y_pred_lasso$Id <- dfTest6$Id
+y_pred_lasso[,c(1,2)] <- y_pred_lasso[,c(2,1)]
+colnames(y_pred_lasso) <- c("Id", "SalePrice")
+#y_pred_lasso[is.na(y_pred_lasso)] <- log(mean(home_sales$SalePrice))
+y_pred_lasso$SalePrice <- exp(y_pred_lasso$SalePrice)
+```
+```{r}
+#write.csv(y_pred_lasso, "C:\\Users\\carli\\OneDrive\\Documents\\621\\LassoPredictions.csv")
+```
+
+```{r}
+# Lasso Regression with Scaled Data
+scaled_training <- data.matrix(df7b)
+```
+
+
+```{r}
+scaled_lasso <- cv.glmnet(scaled_training, y_train, alpha = 1)
+
+```
+```{r}
+lasso_scaledlambda <- scaled_lasso$lambda.min; lasso_scaledlambda
+optimizedscaled_lasso <- glmnet(scaled_training, y_train, alpha = 1, lambda = lasso_scaledlambda)
+
+
+```
+```{r}
+xSub <- data.matrix(dfSubmit7a)
+```
+```{r}
+y_pred_lasso2 <- predict(optimizedscaled_lasso, s = lasso_scaledlambda, newx = xSub)
+y_pred_lasso2 <- data.frame(as.vector(y_pred_lasso2))
+y_pred_lasso2$Id <- dfTest6$Id
+y_pred_lasso2[,c(1,2)] <- y_pred_lasso2[,c(2,1)]
+colnames(y_pred_lasso2) <- c("Id", "SalePrice")
+#y_pred_lasso[is.na(y_pred_lasso)] <- log(mean(home_sales$SalePrice))
+y_pred_lasso2$SalePrice <- exp(y_pred_lasso2$SalePrice)
+```
+```{r}
+#write.csv(y_pred_lasso2, "C:\\Users\\carli\\OneDrive\\Documents\\621\\LassoPredictions2.csv")
+```
+
+```{r, include=FALSE}
+library(caret)
+library(dplyr)
+```
+
+```{r, include=FALSE}
+control <- trainControl(method = "repeatedcv", number = 5, repeats = 5, search = "random", verboseIter = TRUE)
+```
+
+```{r, include=FALSE}
+enet <- train(SalePrice ~ ., data = dfTrain6, method = "glmnet", preProcess = c("center", "scale"), tuneLength = 25, trControl = control)
+```
+
+
+```{r, include=FALSE}
+optimized_enet <- glmnet(scaled_training, y_train, alpha = .162, lambda = 0.0289)
+```
+
+```{r, include=FALSE}
+y_pred_enet <- predict(optimized_enet, xSub)
+y_pred_enet <- data.frame(as.vector(y_pred_enet))
+y_pred_enet$Id <- dfTest6$Id
+y_pred_enet[,c(1,2)] <- y_pred_enet[,c(2,1)]
+colnames(y_pred_enet) <- c("Id", "SalePrice")
+#y_pred_lasso[is.na(y_pred_lasso)] <- log(mean(home_sales$SalePrice))
+y_pred_enet$SalePrice <- exp(y_pred_enet$SalePrice)
+```
+```{r}
+#write.csv(y_pred_enet, "C:\\Users\\carli\\OneDrive\\Documents\\621\\ElasticNetPredictions.csv")
+```
+
+```{r}
+# Using a basic regression tree via the rpart() function
+# Load package
+
+
+# Build the model
+modelE <- rpart(SalePrice ~ ., data = dfTrain6)
+
+# View summary of model
+printcp(modelE)
+
+# Plot the decision tree
+rpart.plot(modelE)
+```
+
+
+```{r}
+# Make predictions
+modelEpreds <- predict(modelE,newdata=dfTest6)
+modelEpreds <- data.frame(as.vector(modelEpreds))
+modelEpreds$Id <- dfTest6$Id
+modelEpreds[,c(1,2)] <- modelEpreds[,c(2,1)]
+colnames(modelEpreds) <- c("Id", "SalePrice")
+modelEpreds[is.na(modelEpreds)] <- log(mean(dfTrain$SalePrice))
+modelEpreds$SalePrice <- exp(modelEpreds$SalePrice)
+
+# Save to file
+# write.csv(modelEpreds, file = "modelEresults.csv", row.names=FALSE)
+
+```
+
+
+```{r, include=FALSE}
+library(gbm)
+ehboost=gbm(SalePrice ~ . ,data = dfTrain6, distribution = "gaussian",n.trees = 10000,
+                  shrinkage = 0.01, interaction.depth = 4)
+
+q <- as.data.frame(summary(ehboost)) #Summary gives a table of Variable Importance and a plot of Variable Importance
+```
+```{r}
+knitr::kable(head(q, 20))
+```
+
+```{r}
+
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictionsBoost.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(ehboost)
+
+```
+
+
+```{r, include=FALSE}
+library(randomForest)
+
+# Create the forest.
+ehforest <- randomForest(SalePrice ~ ., 
+           data = dfTrain6)
+
+# View the forest results.
+
+```
+```{r}
+print(ehforest) 
+
+qqq <- as.data.frame(importance(ehforest,type = 2))
+
+qqq2 <- qqq %>%
+  arrange(desc(qqq))
+
+knitr::kable(head(qqq2, 20))
+```
+
+```{r}
+
+
+makePredictions2 <- function(df)
+{
+predictions <- predict(df,newdata=dfTest6)
+predictions <- data.frame(as.vector(predictions))
+predictions$Id <- dfTest6$Id
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("Id", "SalePrice")
+predictions[is.na(predictions)] <- log(mean(dfTrain$SalePrice))
+predictions$SalePrice <- exp(predictions$SalePrice)
+#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\predictionsForest.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+makePredictions2(ehforest)
+
+```
+
